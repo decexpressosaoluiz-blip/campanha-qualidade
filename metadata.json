@@ -1,0 +1,5 @@
+{
+  "name": "Painel Operacional São Luiz Express",
+  "description": "Painel gerencial e operacional para monitoramento de metas, baixas e manifestos com cálculo de projeção e visualização de dados em tempo real.",
+  "requestFramePermissions": []
+}
