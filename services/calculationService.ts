@@ -1,3 +1,4 @@
+
 import { Cte, UnitMeta, AppData, UnitStats } from '../types';
 
 export const normalizeUnitName = (name: string): string => {
@@ -69,6 +70,7 @@ export const calculateStats = (
     unitMap.set(m.unidade, {
       unidade: m.unidade,
       faturamento: 0,
+      recebido: 0,
       meta: m.meta,
       projecao: 0,
       percentualProjecao: 0,
@@ -87,16 +89,11 @@ export const calculateStats = (
   });
 
   const hasDateFilter = dateRange?.start && dateRange?.end;
-  // Normalize filters to boundaries
   const filterStart = dateRange?.start ? new Date(dateRange.start.getFullYear(), dateRange.start.getMonth(), dateRange.start.getDate(), 0,0,0) : null;
   const filterEnd = dateRange?.end ? new Date(dateRange.end.getFullYear(), dateRange.end.getMonth(), dateRange.end.getDate(), 23,59,59) : null;
 
-  let maxDataDate = new Date(0); 
-
   // Process CTEs
   data.ctes.forEach(cte => {
-    if (cte.data > maxDataDate) maxDataDate = cte.data;
-
     if (hasDateFilter && filterStart && filterEnd) {
       if (cte.data < filterStart || cte.data > filterEnd) return; 
     }
@@ -119,8 +116,10 @@ export const calculateStats = (
     const unitEntrega = normalizeUnitName(cte.unidadeEntrega);
     if (unitEntrega && unitMap.has(unitEntrega)) {
       const stats = unitMap.get(unitEntrega)!;
+      // Incrementa Recebido baseado na entrega (Coluna I)
+      stats.recebido += cte.valor;
+
       const statusPrazo = normalizeStatus(cte.statusPrazo);
-      
       if (statusPrazo === 'NO PRAZO') {
         stats.baixaNoPrazo++;
         stats.docsBaixaNoPrazo.push(cte);
@@ -134,28 +133,16 @@ export const calculateStats = (
     }
   });
 
-  // --- PROJECTION CALCULATION (SIMPLIFIED) ---
-  // Using fixed values from G1 and H1 of the CSV to avoid any logic/timezone errors.
-  
   const daysElapsed = data.fixedDays.elapsed > 0 ? data.fixedDays.elapsed : 1;
   const totalDaysInPeriod = data.fixedDays.total > 0 ? data.fixedDays.total : 1;
 
-  // Debug Log
-  console.log(`[PROJ CALC] Using Fixed Days from CSV -> Elapsed: ${daysElapsed} | Total: ${totalDaysInPeriod}`);
-
-  // Apply Projection
   Array.from(unitMap.values()).forEach(stats => {
-    // Media Diária = Faturamento / Dias Passados
     const dailyAvg = stats.faturamento / daysElapsed;
-    
-    // Projeção = Media Diária * Dias Totais
     stats.projecao = dailyAvg * totalDaysInPeriod;
-    
     stats.percentualProjecao = stats.meta > 0 ? (stats.projecao / stats.meta) * 100 : 0;
   });
 
   const allStats = Array.from(unitMap.values());
-  
   if (specificUnit) {
     return allStats.filter(s => s.unidade === normalizeUnitName(specificUnit));
   }

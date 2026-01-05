@@ -1,8 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { UnitStats, SortField } from '../types';
 import { Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ComposedChart } from 'recharts';
 import Card from './Card';
-import { DollarSign, Truck, FileText, Search, ArrowUpDown, Calendar, Filter, AlertTriangle, CheckCircle, XCircle, ChevronDown, Clock, Info } from 'lucide-react';
+import { DollarSign, Truck, FileText, Search, ArrowUpDown, Calendar, Filter, AlertTriangle, CheckCircle, XCircle, ChevronDown, Clock, Info, Image as ImageIcon } from 'lucide-react';
+import { toJpeg } from 'html-to-image';
 
 interface ManagerDashboardProps {
   stats: UnitStats[];
@@ -17,10 +18,15 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, onSelectUnit
   const [filter, setFilter] = useState('');
   const [sortField, setSortField] = useState<SortField>('faturamento'); 
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const exportRef = useRef<HTMLDivElement>(null);
+  const [isExporting, setIsExporting] = useState(false);
   
-  // Aggregate Totals
+  const filteredStats = useMemo(() => {
+    return stats.filter(s => s.unidade.includes(filter.toUpperCase()));
+  }, [stats, filter]);
+
   const totalStats = useMemo(() => {
-    return stats.reduce((acc, curr) => ({
+    return filteredStats.reduce((acc, curr) => ({
       faturamento: acc.faturamento + curr.faturamento,
       meta: acc.meta + curr.meta,
       projecao: acc.projecao + curr.projecao,
@@ -31,21 +37,20 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, onSelectUnit
       semMdfe: acc.semMdfe + curr.semMdfe,
       totalCtes: acc.totalCtes + (curr.comMdfe + curr.semMdfe)
     }), { faturamento: 0, meta: 0, projecao: 0, baixaNoPrazo: 0, baixaForaPrazo: 0, semBaixa: 0, comMdfe: 0, semMdfe: 0, totalCtes: 0 });
-  }, [stats]);
+  }, [filteredStats]);
 
-  // Calculations for Card Percentages
-  const totalBaixas = totalStats.baixaNoPrazo + totalStats.baixaForaPrazo + totalStats.semBaixa;
-  const pctNoPrazo = totalBaixas ? (totalStats.baixaNoPrazo / totalBaixas) * 100 : 0;
-  const pctSemBaixa = totalBaixas ? (totalStats.semBaixa / totalBaixas) * 100 : 0;
-  const pctAtrasadas = totalBaixas ? (totalStats.baixaForaPrazo / totalBaixas) * 100 : 0;
-  
-  const totalManifestos = totalStats.comMdfe + totalStats.semMdfe;
-  const pctComMdfe = totalManifestos ? (totalStats.comMdfe / totalManifestos) * 100 : 0;
-  const pctSemMdfe = totalManifestos ? (totalStats.semMdfe / totalManifestos) * 100 : 0;
-
-  // General Revenue Projections
   const generalPercentProj = totalStats.meta > 0 ? (totalStats.projecao / totalStats.meta) * 100 : 0;
   const generalPercentFat = totalStats.meta > 0 ? (totalStats.faturamento / totalStats.meta) * 100 : 0;
+
+  // Fix: Added missing percentage calculations for general stats cards (lines 48-55)
+  const totalBaixas = totalStats.baixaNoPrazo + totalStats.baixaForaPrazo + totalStats.semBaixa;
+  const pctNoPrazo = totalBaixas > 0 ? (totalStats.baixaNoPrazo / totalBaixas) * 100 : 0;
+  const pctSemBaixa = totalBaixas > 0 ? (totalStats.semBaixa / totalBaixas) * 100 : 0;
+  const pctAtrasadas = totalBaixas > 0 ? (totalStats.baixaForaPrazo / totalBaixas) * 100 : 0;
+
+  const totalManifestos = totalStats.comMdfe + totalStats.semMdfe;
+  const pctComMdfe = totalManifestos > 0 ? (totalStats.comMdfe / totalManifestos) * 100 : 0;
+  const pctSemMdfe = totalManifestos > 0 ? (totalStats.semMdfe / totalManifestos) * 100 : 0;
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -69,44 +74,32 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, onSelectUnit
   };
 
   const sortedStats = useMemo(() => {
-    let filtered = stats.filter(s => s.unidade.includes(filter.toUpperCase()));
-
-    return filtered.sort((a, b) => {
+    return [...filteredStats].sort((a, b) => {
       let valA = 0;
       let valB = 0;
-
       switch (sortField) {
-        case 'unidade':
-          return sortDirection === 'asc' 
-            ? a.unidade.localeCompare(b.unidade) 
-            : b.unidade.localeCompare(a.unidade);
-        case 'faturamento':
-          valA = a.faturamento; valB = b.faturamento; break;
-        case 'projecao':
-          valA = a.percentualProjecao; valB = b.percentualProjecao; break;
+        case 'unidade': return sortDirection === 'asc' ? a.unidade.localeCompare(b.unidade) : b.unidade.localeCompare(a.unidade);
+        case 'faturamento': valA = a.faturamento; valB = b.faturamento; break;
+        case 'projecao': valA = a.percentualProjecao; valB = b.percentualProjecao; break;
         case 'noPrazo':
            valA = (a.baixaNoPrazo + a.baixaForaPrazo + a.semBaixa) > 0 ? a.baixaNoPrazo / (a.baixaNoPrazo + a.baixaForaPrazo + a.semBaixa) : 0;
            valB = (b.baixaNoPrazo + b.baixaForaPrazo + b.semBaixa) > 0 ? b.baixaNoPrazo / (b.baixaNoPrazo + b.baixaForaPrazo + b.semBaixa) : 0;
            break;
-        case 'semBaixa':
-          valA = a.semBaixa; valB = b.semBaixa; break;
+        case 'semBaixa': valA = a.semBaixa; valB = b.semBaixa; break;
         case 'semMdfe':
-          const totalMdfeA = a.comMdfe + a.semMdfe;
-          const totalMdfeB = b.comMdfe + b.semMdfe;
-          valA = totalMdfeA > 0 ? a.semMdfe / totalMdfeA : 0;
-          valB = totalMdfeB > 0 ? b.semMdfe / totalMdfeB : 0;
+          const tMdfeA = a.comMdfe + a.semMdfe;
+          const tMdfeB = b.comMdfe + b.semMdfe;
+          valA = tMdfeA > 0 ? a.semMdfe / tMdfeA : 0;
+          valB = tMdfeB > 0 ? b.semMdfe / tMdfeB : 0;
           break;
       }
-
       return sortDirection === 'asc' ? valA - valB : valB - valA;
     });
-  }, [stats, filter, sortField, sortDirection]);
+  }, [filteredStats, sortField, sortDirection]);
 
   const chartData = useMemo(() => {
-    return [...stats]
-      .sort((a, b) => b.faturamento - a.faturamento)
-      .slice(0, 20);
-  }, [stats]);
+    return [...filteredStats].sort((a, b) => b.faturamento - a.faturamento).slice(0, 20);
+  }, [filteredStats]);
 
   const globalMax = useMemo(() => {
     if (chartData.length === 0) return 0;
@@ -119,11 +112,37 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, onSelectUnit
     return '#EC1B23';
   };
 
+  const handleDownloadImage = async () => {
+    if (!exportRef.current) return;
+    setIsExporting(true);
+    
+    try {
+      // Forçamos a visibilidade momentaneamente para a captura
+      const element = exportRef.current;
+      
+      const dataUrl = await toJpeg(element, {
+        quality: 0.95,
+        backgroundColor: '#ffffff',
+        pixelRatio: 2,
+        cacheBust: true,
+      });
+
+      const link = document.createElement('a');
+      link.download = `Ranking_SLE_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.jpeg`;
+      link.href = dataUrl;
+      link.click();
+    } catch (err) {
+      console.error('Erro ao exportar imagem:', err);
+      alert('Não foi possível gerar a imagem. Tente novamente.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload as UnitStats;
       const color = getColorByProjection(data.percentualProjecao);
-      
       return (
         <div className="bg-white p-4 border border-gray-200 shadow-xl rounded-lg text-sm z-50">
           <p className="font-bold text-[#0F103A] mb-3 text-base border-b pb-2">{label.replace('DEC - ', '')}</p>
@@ -158,15 +177,86 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, onSelectUnit
   return (
     <div className="space-y-8 animate-fade-in pb-10">
       
+      {/* Container Oculto para Exportação (Corrigido para evitar tela branca) */}
+      <div style={{ height: 0, overflow: 'hidden', position: 'absolute', zIndex: -100 }}>
+        <div 
+          ref={exportRef} 
+          style={{ 
+            width: '800px', 
+            background: '#ffffff', 
+            padding: '40px',
+            color: '#0F103A',
+            fontFamily: 'sans-serif'
+          }}
+        >
+          <div style={{ marginBottom: '30px', borderBottom: '3px solid #0F103A', paddingBottom: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+            <div>
+              <h1 style={{ margin: 0, fontSize: '28px', fontWeight: 900, letterSpacing: '-1px' }}>SÃO LUIZ EXPRESS</h1>
+              <p style={{ margin: 0, color: '#2E31B4', fontSize: '14px', fontWeight: 700, textTransform: 'uppercase' }}>Ranking de Projeção de Faturamento</p>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <p style={{ margin: 0, fontSize: '10px', fontWeight: 800, color: '#999', textTransform: 'uppercase' }}>Atualizado: {lastUpdate.toLocaleDateString('pt-BR')}</p>
+              <p style={{ margin: 0, fontSize: '12px', fontWeight: 900 }}>DIAS ÚTEIS: {fixedDays.elapsed} / {fixedDays.total}</p>
+            </div>
+          </div>
+
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: '#E8E8F9', color: '#24268B' }}>
+                <th style={{ padding: '12px 15px', textAlign: 'left', fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', borderBottom: '2px solid #ddd' }}>UNIDADE</th>
+                <th style={{ padding: '12px 15px', textAlign: 'right', fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', borderBottom: '2px solid #ddd' }}>FATURAMENTO</th>
+                <th style={{ padding: '12px 15px', textAlign: 'right', fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', borderBottom: '2px solid #ddd' }}>PROJEÇÃO FATURAMENTO</th>
+                <th style={{ padding: '12px 15px', textAlign: 'center', fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', borderBottom: '2px solid #ddd' }}>% PROJEÇÃO</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedStats.map((stat) => (
+                <tr key={stat.unidade} style={{ borderBottom: '1px solid #eee' }}>
+                  <td style={{ padding: '12px 15px', fontSize: '12px', fontWeight: 700, textTransform: 'uppercase' }}>{stat.unidade}</td>
+                  <td style={{ padding: '12px 15px', textAlign: 'right', fontSize: '12px', color: '#444' }}>{stat.faturamento.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                  <td style={{ padding: '12px 15px', textAlign: 'right', fontSize: '12px', fontWeight: 800, color: '#2E31B4' }}>{stat.projecao.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                  <td style={{ padding: '12px 15px', textAlign: 'center' }}>
+                    <span style={{ 
+                      padding: '4px 8px', 
+                      borderRadius: '4px', 
+                      fontSize: '10px', 
+                      fontWeight: 900,
+                      backgroundColor: stat.percentualProjecao >= 100 ? '#DCFCE7' : stat.percentualProjecao >= 95 ? '#FEF9C3' : '#FEE2E2',
+                      color: stat.percentualProjecao >= 100 ? '#15803D' : stat.percentualProjecao >= 95 ? '#A16207' : '#B91C1C'
+                    }}>
+                      {stat.percentualProjecao.toFixed(1)}%
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div style={{ marginTop: '20px', paddingTop: '10px', borderTop: '1px solid #eee', fontSize: '9px', color: '#ccc', textAlign: 'center', fontWeight: 700, textTransform: 'uppercase' }}>
+            Relatório Gerencial • São Luiz Express • 2026
+          </div>
+        </div>
+      </div>
+
       {/* Header Info Bar */}
-      <div className="bg-white px-6 py-3 rounded-lg shadow-sm border border-gray-200 flex flex-col md:flex-row justify-between items-center">
+      <div className="bg-white px-6 py-3 rounded-lg shadow-sm border border-gray-200 flex flex-col md:flex-row justify-between items-center gap-4">
         <div className="flex items-center text-[#2E31B4] mb-2 md:mb-0">
           <Clock className="w-5 h-5 mr-2" />
           <span className="font-semibold text-sm">Atualizado: {lastUpdate.toLocaleDateString('pt-BR')}</span>
         </div>
         
-        <div className="flex items-center gap-4">
-            <div className="flex items-center text-gray-500 text-xs bg-blue-50 px-3 py-1.5 rounded-full border border-blue-100">
+        <div className="flex flex-wrap items-center justify-center md:justify-end gap-3 md:gap-4">
+            <div className="relative group min-w-[200px]">
+               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+               <input 
+                 type="text" 
+                 placeholder="Buscar unidade..." 
+                 className="pl-9 pr-4 py-1.5 border border-[#2E31B4] ring-1 ring-[#2E31B4]/20 rounded-full text-xs w-full focus:ring-2 focus:ring-[#2E31B4] outline-none bg-blue-50/10 hover:bg-white transition-all shadow-sm" 
+                 value={filter} 
+                 onChange={(e) => setFilter(e.target.value)} 
+               />
+            </div>
+
+            <div className="flex items-center text-gray-500 text-xs bg-blue-50 px-3 py-1.5 rounded-full border border-blue-100 whitespace-nowrap">
                <Info className="w-3 h-3 mr-1" />
                <span className="font-semibold text-blue-800 tracking-wide uppercase">Dias Úteis: {fixedDays.elapsed} / {fixedDays.total}</span>
             </div>
@@ -190,9 +280,8 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, onSelectUnit
         </div>
       </div>
 
-      {/* KPI Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card title="FATURAMENTO GERAL" icon={<DollarSign className="w-6 h-6"/>} className="border-l-blue-700 shadow-md">
+        <Card title={filter ? `VENDAS: ${filter.toUpperCase()}` : "FATURAMENTO GERAL"} icon={<DollarSign className="w-6 h-6"/>} className="border-l-blue-700 shadow-md">
            <div className="flex flex-col gap-4">
              <div>
                <div className="text-4xl font-extrabold text-[#0F103A] tracking-tight truncate">
@@ -202,7 +291,6 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, onSelectUnit
                  Meta: {totalStats.meta.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}
                </div>
              </div>
-             
              <div>
                 <div className="flex justify-between items-end mb-2">
                    <div className="flex flex-col">
@@ -266,36 +354,48 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, onSelectUnit
         </Card>
       </div>
 
-      {/* Chart Section */}
       <div className="bg-white p-6 rounded-lg shadow-lg border border-gray-100">
-        <h3 className="text-xl font-bold text-[#0F103A] mb-6">Top 20 Unidades (Faturamento Realizado)</h3>
+        <h3 className="text-xl font-bold text-[#0F103A] mb-6">
+          {filter ? `Resultados: ${filter.toUpperCase()}` : "Top 20 Unidades (Faturamento Realizado)"}
+        </h3>
         <div className="h-[700px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart layout="vertical" data={chartData} margin={{ top: 0, right: 30, left: 40, bottom: 20 }} barGap={-24}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis type="number" xAxisId={0} hide domain={[0, globalMax]} />
-              <YAxis dataKey="unidade" type="category" tick={{fontSize: 12, fontWeight: 700, fill: '#374151'}} tickFormatter={(v) => v.replace('DEC - ', '')} width={160} />
-              <Tooltip cursor={{fill: '#F3F4F6'}} content={<CustomTooltip />} />
-              <Bar dataKey="meta" barSize={24} xAxisId={0} radius={[0, 4, 4, 0]} fill="#E5E7EB" />
-              <Bar dataKey="projecao" barSize={24} xAxisId={0} radius={[0, 4, 4, 0]}>
-                {chartData.map((entry, index) => <Cell key={`proj-${index}`} fill={getColorByProjection(entry.percentualProjecao)} opacity={0.5} />)}
-              </Bar>
-              <Bar dataKey="faturamento" barSize={24} xAxisId={0} radius={[0, 4, 4, 0]}>
-                {chartData.map((entry, index) => <Cell key={`fat-${index}`} fill={getColorByProjection(entry.percentualProjecao)} />)}
-              </Bar>
-            </ComposedChart>
-          </ResponsiveContainer>
+          {chartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart layout="vertical" data={chartData} margin={{ top: 0, right: 30, left: 40, bottom: 20 }} barGap={-24}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis type="number" xAxisId={0} hide domain={[0, globalMax]} />
+                <YAxis dataKey="unidade" type="category" tick={{fontSize: 12, fontWeight: 700, fill: '#374151'}} tickFormatter={(v) => v.replace('DEC - ', '')} width={160} />
+                <Tooltip cursor={{fill: '#F3F4F6'}} content={<CustomTooltip />} />
+                <Bar dataKey="meta" barSize={24} xAxisId={0} radius={[0, 4, 4, 0]} fill="#E5E7EB" />
+                <Bar dataKey="projecao" barSize={24} xAxisId={0} radius={[0, 4, 4, 0]}>
+                  {chartData.map((entry, index) => <Cell key={`proj-${index}`} fill={getColorByProjection(entry.percentualProjecao)} opacity={0.5} />)}
+                </Bar>
+                <Bar dataKey="faturamento" barSize={24} xAxisId={0} radius={[0, 4, 4, 0]}>
+                  {chartData.map((entry, index) => <Cell key={`fat-${index}`} fill={getColorByProjection(entry.percentualProjecao)} />)}
+                </Bar>
+              </ComposedChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-full flex items-center justify-center text-gray-400 italic">Nenhuma unidade encontrada para "{filter}"</div>
+          )}
         </div>
       </div>
 
-      {/* Table Section */}
       <div id="ranking-table" className="bg-white rounded-lg shadow-lg overflow-hidden border border-gray-100 scroll-mt-24">
         <div className="p-5 border-b bg-gray-50 flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-4">
              <Filter className="text-[#2E31B4] w-5 h-5"/>
              <h3 className="font-bold text-[#0F103A] text-lg uppercase tracking-wide">Ranking Geral de Unidades</h3>
           </div>
-          <div className="flex gap-4 w-full md:w-auto">
+          <div className="flex gap-3">
+             <button 
+                disabled={isExporting}
+                onClick={handleDownloadImage} 
+                className={`flex items-center space-x-2 text-xs text-white bg-green-600 px-4 py-2 rounded-full border border-green-700 shadow-sm transition-all hover:bg-green-700 active:scale-95 ${isExporting ? 'opacity-50 cursor-not-allowed' : ''}`}
+             >
+                {isExporting ? <Clock className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
+                <span className="font-bold uppercase tracking-tight">{isExporting ? 'Gerando...' : 'Baixar Imagem'}</span>
+             </button>
              <div className="relative group">
                 <button className="flex items-center space-x-2 text-sm text-gray-600 bg-white px-4 py-2 rounded-full border border-gray-200 shadow-sm transition-all hover:bg-gray-50">
                    <ArrowUpDown className="w-4 h-4" />
@@ -312,55 +412,48 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, onSelectUnit
                    </div>
                 </div>
              </div>
-             <div className="relative flex-grow">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <input type="text" placeholder="Buscar unidade..." className="pl-10 pr-4 py-2 border rounded-full text-sm w-full md:w-64 focus:ring-2 focus:ring-[#2E31B4] outline-none" value={filter} onChange={(e) => setFilter(e.target.value)} />
-             </div>
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto bg-white">
           <table className="min-w-full text-sm">
             <thead className="bg-[#E8E8F9] text-[#24268B]">
                <tr>
-                 <th className="px-6 py-4 text-left font-bold cursor-pointer hover:bg-blue-100" onClick={() => handleSort('unidade')}>Unidade</th>
-                 <th className="px-6 py-4 text-right font-bold cursor-pointer hover:bg-blue-100" onClick={() => handleSort('projecao')}>% Projeção</th>
-                 <th className="px-6 py-4 text-right font-bold hidden md:table-cell cursor-pointer hover:bg-blue-100" onClick={() => handleSort('faturamento')}>Faturamento</th>
-                 <th className="px-6 py-4 text-center font-bold cursor-pointer hover:bg-blue-100" onClick={() => handleSort('noPrazo')}>% Entregas OK</th>
-                 <th className="px-6 py-4 text-center font-bold cursor-pointer hover:bg-blue-100" onClick={() => handleSort('semBaixa')}>Pendências</th>
-                 <th className="px-6 py-4 text-center font-bold cursor-pointer hover:bg-blue-100" onClick={() => handleSort('semMdfe')}>% Sem MDFE</th>
+                 <th className="px-6 py-4 text-left font-bold cursor-pointer hover:bg-blue-100 whitespace-nowrap" onClick={() => handleSort('unidade')}>Unidade</th>
+                 <th className="px-6 py-4 text-right font-bold cursor-pointer hover:bg-blue-100 whitespace-nowrap" onClick={() => handleSort('faturamento')}>Faturamento</th>
+                 <th className="px-6 py-4 text-right font-bold cursor-pointer hover:bg-blue-100 whitespace-nowrap" onClick={() => handleSort('projecao')}>Projeção Faturamento</th>
+                 <th className="px-6 py-4 text-right font-bold cursor-pointer hover:bg-blue-100 whitespace-nowrap" onClick={() => handleSort('projecao')}>% Projeção</th>
+                 <th className="px-6 py-4 text-center font-bold cursor-pointer hover:bg-blue-100 whitespace-nowrap" onClick={() => handleSort('noPrazo')}>% Entregas OK</th>
+                 <th className="px-6 py-4 text-center font-bold cursor-pointer hover:bg-blue-100 whitespace-nowrap" onClick={() => handleSort('semBaixa')}>Pendências</th>
+                 <th className="px-6 py-4 text-center font-bold cursor-pointer hover:bg-blue-100 whitespace-nowrap" onClick={() => handleSort('semMdfe')}>% Sem MDFE</th>
                </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-               {sortedStats.map((stat) => {
+               {sortedStats.length > 0 ? sortedStats.map((stat) => {
                  const tB = stat.baixaNoPrazo + stat.baixaForaPrazo + stat.semBaixa;
                  const pN = tB > 0 ? (stat.baixaNoPrazo / tB) * 100 : 0;
                  const tM = stat.comMdfe + stat.semMdfe;
                  const pM = tM > 0 ? (stat.semMdfe / tM) * 100 : 0;
-
                  return (
                    <tr key={stat.unidade} onClick={() => onSelectUnit(stat.unidade)} className="hover:bg-blue-50 cursor-pointer group">
-                     <td className="px-6 py-4 font-bold text-[#0F103A] group-hover:text-[#2E31B4]">{stat.unidade}</td>
+                     <td className="px-6 py-4 font-bold text-[#0F103A] group-hover:text-[#2E31B4] whitespace-nowrap uppercase">{stat.unidade}</td>
+                     <td className="px-6 py-4 text-right text-gray-700 font-medium whitespace-nowrap">{stat.faturamento.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                     <td className="px-6 py-4 text-right text-[#2E31B4] font-bold whitespace-nowrap">{stat.projecao.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                      <td className="px-6 py-4 text-right">
-                       <span className={`px-2 py-1 rounded text-xs font-bold ${stat.percentualProjecao >= 100 ? 'bg-green-100 text-green-700' : stat.percentualProjecao >= 95 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
-                         {stat.percentualProjecao.toFixed(1)}%
-                       </span>
+                       <span className={`px-2 py-1 rounded text-xs font-bold ${stat.percentualProjecao >= 100 ? 'bg-green-100 text-green-700' : stat.percentualProjecao >= 95 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>{stat.percentualProjecao.toFixed(1)}%</span>
                      </td>
-                     <td className="px-6 py-4 text-right hidden md:table-cell text-gray-700 font-medium">{stat.faturamento.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                      <td className="px-6 py-4 text-center">
-                        <span className={`text-xs font-bold px-2 py-1 rounded ${pN >= 90 ? 'bg-green-100 text-green-700' : pN >= 70 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
-                           {pN.toFixed(1)}%
-                        </span>
+                        <span className={`text-xs font-bold px-2 py-1 rounded ${pN >= 90 ? 'bg-green-100 text-green-700' : pN >= 70 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>{pN.toFixed(1)}%</span>
                      </td>
                      <td className="px-6 py-4 text-center font-bold text-gray-600">{stat.semBaixa}</td>
                      <td className="px-6 py-4 text-center">
-                       <span className={`text-xs font-bold px-2 py-1 rounded ${pM > 0 ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'}`}>
-                         {pM.toFixed(1)}%
-                       </span>
+                       <span className={`text-xs font-bold px-2 py-1 rounded ${pM > 0 ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'}`}>{pM.toFixed(1)}%</span>
                      </td>
                    </tr>
                  );
-               })}
+               }) : (
+                <tr><td colSpan={7} className="px-6 py-12 text-center text-gray-400 italic">Nenhuma unidade encontrada para "{filter}"</td></tr>
+               )}
             </tbody>
           </table>
         </div>

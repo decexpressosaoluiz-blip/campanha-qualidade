@@ -14,8 +14,10 @@ const App: React.FC = () => {
   const [data, setData] = useState<AppData | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
+  const [loginError, setLoginError] = useState<string>('');
   const [view, setView] = useState<DashboardView>(DashboardView.LOGIN);
   const [selectedUnit, setSelectedUnit] = useState<string | null>(null);
+  const [headerActions, setHeaderActions] = useState<React.ReactNode>(null);
   
   const [dateRange, setDateRange] = useState<{start: string, end: string}>({ start: '', end: '' });
 
@@ -91,20 +93,36 @@ const App: React.FC = () => {
 
   const handleLogin = async (username: string, pass: string) => {
     setLoading(true);
+    setLoginError('');
     try {
        const userRows = await fetchCsv(CSV_URLS.USUARIOS);
-       const found = userRows.slice(1).find(row => row[0]?.toLowerCase() === username.toLowerCase() && row[1] === pass);
-       if (found) {
-         const unit = found[2] ? normalizeUnitName(found[2]) : '';
-         setUser({ username: found[0], unit });
-         await loadData();
-         if (!unit) setView(DashboardView.MANAGER);
-         else { setSelectedUnit(unit); setView(DashboardView.UNIT_DETAIL); }
-       } else alert('Credenciais inválidas.');
-    } catch (e) { alert('Erro ao autenticar.'); } finally { setLoading(false); }
+       const users = userRows.slice(1);
+       
+       const userFound = users.find(row => row[0]?.toLowerCase() === username.toLowerCase());
+       
+       if (!userFound) {
+         setLoginError('Usuário incorreto');
+         return;
+       }
+
+       if (userFound[1] !== pass) {
+         setLoginError('Senha incorreta');
+         return;
+       }
+
+       const unit = userFound[2] ? normalizeUnitName(userFound[2]) : '';
+       setUser({ username: userFound[0], unit });
+       await loadData();
+       if (!unit) setView(DashboardView.MANAGER);
+       else { setSelectedUnit(unit); setView(DashboardView.UNIT_DETAIL); }
+    } catch (e) { 
+      setLoginError('Erro ao autenticar. Tente novamente.'); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
-  const handleLogout = () => { setUser(null); setData(null); setView(DashboardView.LOGIN); setSelectedUnit(null); };
+  const handleLogout = () => { setUser(null); setData(null); setView(DashboardView.LOGIN); setSelectedUnit(null); setLoginError(''); };
 
   const renderContent = () => {
     if (loading && !data) return (
@@ -119,19 +137,29 @@ const App: React.FC = () => {
          <button onClick={loadData} className="mt-4 px-4 py-2 bg-[#2E31B4] text-white rounded">Tentar Novamente</button>
       </div>
     );
-    if (view === DashboardView.LOGIN) return <Login onLogin={handleLogin} loading={loading} />;
+    if (view === DashboardView.LOGIN) return <Login onLogin={handleLogin} loading={loading} error={loginError} />;
     if (view === DashboardView.MANAGER && data) {
       const stats = calculateStats(data, undefined, { start: dateRange.start ? new Date(dateRange.start) : null, end: dateRange.end ? new Date(dateRange.end) : null });
       return <ManagerDashboard stats={stats} onSelectUnit={(u) => { setSelectedUnit(u); setView(DashboardView.UNIT_DETAIL); }} onDateFilterChange={(start, end) => setDateRange({ start, end })} dateRange={dateRange} lastUpdate={data.lastUpdate} fixedDays={data.fixedDays} />;
     }
     if (view === DashboardView.UNIT_DETAIL && data && selectedUnit) {
       const stats = calculateStats(data, selectedUnit, { start: dateRange.start ? new Date(dateRange.start) : null, end: dateRange.end ? new Date(dateRange.end) : null });
-      return <UnitDashboard stats={stats[0]} onBack={() => { if (!user?.unit) setView(DashboardView.MANAGER); }} />;
+      return <UnitDashboard stats={stats[0]} user={user} onBack={() => setView(DashboardView.MANAGER)} setHeaderActions={setHeaderActions} />;
     }
     return null;
   };
 
-  return <Layout user={user} onLogout={handleLogout} onHomeClick={() => { if(user && !user.unit) setView(DashboardView.MANAGER); }}>{renderContent()}</Layout>;
+  return (
+    <Layout 
+      user={user} 
+      onLogout={handleLogout} 
+      onHomeClick={() => { if(user && !user.unit) setView(DashboardView.MANAGER); }}
+      onBack={view === DashboardView.UNIT_DETAIL ? () => setView(DashboardView.MANAGER) : undefined}
+      headerActions={headerActions}
+    >
+      {renderContent()}
+    </Layout>
+  );
 };
 
 export default App;

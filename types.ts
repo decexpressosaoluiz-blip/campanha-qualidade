@@ -1,3 +1,4 @@
+
 export interface User {
   username: string;
   unit: string; // Empty for Admin/Manager
@@ -35,6 +36,7 @@ export interface AppData {
 export interface UnitStats {
   unidade: string;
   faturamento: number;
+  recebido: number; // Novo campo para total baseado na entrega (Coluna I)
   meta: number;
   projecao: number;
   percentualProjecao: number;
