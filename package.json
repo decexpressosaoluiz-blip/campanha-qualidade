@@ -1,3 +1,4 @@
+
 {
   "name": "painel-operacional-sle",
   "private": true,
@@ -14,7 +15,8 @@
     "lucide-react": "^0.460.0",
     "recharts": "^2.13.3",
     "clsx": "^2.1.1",
-    "tailwind-merge": "^2.5.4"
+    "tailwind-merge": "^2.5.4",
+    "html-to-image": "^1.11.11"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",

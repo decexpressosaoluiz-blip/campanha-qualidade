@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useRef } from 'react';
 import { UnitStats, SortField } from '../types';
 import { Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ComposedChart } from 'recharts';
@@ -18,7 +19,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, onSelectUnit
   const [filter, setFilter] = useState('');
   const [sortField, setSortField] = useState<SortField>('faturamento'); 
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
-  const exportRef = useRef<HTMLDivElement>(null);
+  const exportContainerRef = useRef<HTMLDivElement>(null);
   const [isExporting, setIsExporting] = useState(false);
   
   const filteredStats = useMemo(() => {
@@ -110,24 +111,18 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, onSelectUnit
   };
 
   const handleDownloadImage = async () => {
-    if (!exportRef.current) return;
+    if (!exportContainerRef.current) return;
     setIsExporting(true);
     
     try {
-      // Garantir que o elemento esteja pronto e visível para a biblioteca (mas fora da tela do usuário)
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Pequeno delay para garantir que o DOM fora da tela foi processado
+      await new Promise(resolve => setTimeout(resolve, 300));
       
-      const dataUrl = await toJpeg(exportRef.current, {
+      const dataUrl = await toJpeg(exportContainerRef.current, {
         quality: 0.95,
         backgroundColor: '#ffffff',
         pixelRatio: 2,
         cacheBust: true,
-        style: {
-          transform: 'scale(1)',
-          transformOrigin: 'top left',
-          opacity: '1',
-          visibility: 'visible'
-        }
       });
 
       const link = document.createElement('a');
@@ -136,7 +131,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, onSelectUnit
       link.click();
     } catch (err) {
       console.error('Erro ao exportar imagem:', err);
-      alert('Ocorreu um erro ao gerar a imagem. Verifique se o navegador permite o download.');
+      alert('Houve um erro ao gerar a imagem. Tente novamente.');
     } finally {
       setIsExporting(false);
     }
@@ -180,50 +175,53 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, onSelectUnit
   return (
     <div className="space-y-8 animate-fade-in pb-10">
       
-      {/* EXPORT CONTAINER: Posicionado fora da tela para captura sem erros de renderização */}
+      {/* 
+         HIDDEN EXPORT VIEW 
+         Este bloco é renderizado mas posicionado fora da tela (left: -9999px).
+         Contém apenas as colunas: UNIDADE, FATURAMENTO, PROJEÇÃO FATURAMENTO e % PROJEÇÃO.
+      */}
       <div 
         style={{ 
-          position: 'fixed', 
-          top: '-20000px', 
-          left: '0', 
-          width: '900px', 
-          background: '#ffffff',
-          zIndex: -9999
+          position: 'absolute', 
+          left: '-9999px', 
+          top: '0', 
+          width: '850px', 
+          backgroundColor: '#fff' 
         }}
       >
-        <div ref={exportRef} style={{ padding: '40px', background: '#ffffff' }}>
+        <div ref={exportContainerRef} style={{ padding: '40px', background: '#fff' }}>
           <div style={{ marginBottom: '30px', borderBottom: '4px solid #0F103A', paddingBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
             <div>
-              <h1 style={{ margin: 0, fontSize: '32px', fontWeight: 900, color: '#0F103A', fontFamily: 'sans-serif' }}>SÃO LUIZ EXPRESS</h1>
-              <p style={{ margin: 0, color: '#2E31B4', fontSize: '16px', fontWeight: 800, textTransform: 'uppercase', fontFamily: 'sans-serif' }}>Ranking Geral: Projeção de Faturamento</p>
+              <h1 style={{ margin: 0, fontSize: '28px', fontWeight: 900, color: '#0F103A', fontFamily: 'sans-serif' }}>SÃO LUIZ EXPRESS</h1>
+              <p style={{ margin: 0, color: '#2E31B4', fontSize: '14px', fontWeight: 800, textTransform: 'uppercase', fontFamily: 'sans-serif' }}>Ranking de Projeção de Faturamento</p>
             </div>
             <div style={{ textAlign: 'right', fontFamily: 'sans-serif' }}>
-              <p style={{ margin: 0, fontSize: '10px', color: '#888', fontWeight: 700 }}>ATUALIZADO: {lastUpdate.toLocaleDateString('pt-BR')}</p>
-              <p style={{ margin: 0, fontSize: '14px', fontWeight: 900, color: '#0F103A' }}>DIAS ÚTEIS: {fixedDays.elapsed} / {fixedDays.total}</p>
+              <p style={{ margin: 0, fontSize: '10px', color: '#888', fontWeight: 700 }}>REF: {lastUpdate.toLocaleDateString('pt-BR')}</p>
+              <p style={{ margin: 0, fontSize: '12px', fontWeight: 900, color: '#0F103A' }}>DIAS: {fixedDays.elapsed} / {fixedDays.total}</p>
             </div>
           </div>
 
           <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: 'sans-serif' }}>
             <thead>
-              <tr style={{ background: '#F4F4FD', borderBottom: '2px solid #0F103A' }}>
-                <th style={{ padding: '15px', textAlign: 'left', fontSize: '12px', fontWeight: 900, color: '#0F103A' }}>UNIDADE</th>
-                <th style={{ padding: '15px', textAlign: 'right', fontSize: '12px', fontWeight: 900, color: '#0F103A' }}>FATURAMENTO</th>
-                <th style={{ padding: '15px', textAlign: 'right', fontSize: '12px', fontWeight: 900, color: '#2E31B4' }}>PROJEÇÃO FATURAMENTO</th>
-                <th style={{ padding: '15px', textAlign: 'center', fontSize: '12px', fontWeight: 900, color: '#0F103A' }}>% PROJEÇÃO</th>
+              <tr style={{ background: '#E8E8F9', borderBottom: '2px solid #0F103A' }}>
+                <th style={{ padding: '15px', textAlign: 'left', fontSize: '11px', fontWeight: 900, color: '#24268B', textTransform: 'uppercase' }}>Unidade</th>
+                <th style={{ padding: '15px', textAlign: 'right', fontSize: '11px', fontWeight: 900, color: '#24268B', textTransform: 'uppercase' }}>Faturamento</th>
+                <th style={{ padding: '15px', textAlign: 'right', fontSize: '11px', fontWeight: 900, color: '#2E31B4', textTransform: 'uppercase' }}>Projeção Faturamento</th>
+                <th style={{ padding: '15px', textAlign: 'center', fontSize: '11px', fontWeight: 900, color: '#24268B', textTransform: 'uppercase' }}>% Projeção</th>
               </tr>
             </thead>
             <tbody>
               {sortedStats.map((stat, idx) => (
-                <tr key={stat.unidade} style={{ borderBottom: '1px solid #eee', background: idx % 2 === 0 ? '#fff' : '#fafafa' }}>
-                  <td style={{ padding: '12px 15px', fontSize: '13px', fontWeight: 800, color: '#0F103A' }}>{stat.unidade}</td>
-                  <td style={{ padding: '12px 15px', textAlign: 'right', fontSize: '13px', color: '#555', fontWeight: 600 }}>{stat.faturamento.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                  <td style={{ padding: '12px 15px', textAlign: 'right', fontSize: '14px', fontWeight: 900, color: '#2E31B4' }}>{stat.projecao.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                <tr key={stat.unidade} style={{ borderBottom: '1px solid #eee', background: idx % 2 === 0 ? '#fff' : '#f9f9ff' }}>
+                  <td style={{ padding: '12px 15px', fontSize: '12px', fontWeight: 800, color: '#0F103A', textTransform: 'uppercase' }}>{stat.unidade}</td>
+                  <td style={{ padding: '12px 15px', textAlign: 'right', fontSize: '12px', color: '#444', fontWeight: 600 }}>{stat.faturamento.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                  <td style={{ padding: '12px 15px', textAlign: 'right', fontSize: '13px', fontWeight: 900, color: '#2E31B4' }}>{stat.projecao.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
                   <td style={{ padding: '12px 15px', textAlign: 'center' }}>
                     <div style={{ 
                       display: 'inline-block',
-                      padding: '5px 10px', 
-                      borderRadius: '6px', 
-                      fontSize: '11px', 
+                      padding: '4px 8px', 
+                      borderRadius: '4px', 
+                      fontSize: '10px', 
                       fontWeight: 900,
                       backgroundColor: stat.percentualProjecao >= 100 ? '#DCFCE7' : stat.percentualProjecao >= 95 ? '#FEF9C3' : '#FEE2E2',
                       color: stat.percentualProjecao >= 100 ? '#15803D' : stat.percentualProjecao >= 95 ? '#A16207' : '#B91C1C'
@@ -235,13 +233,13 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, onSelectUnit
               ))}
             </tbody>
           </table>
-          <div style={{ marginTop: '30px', paddingTop: '15px', borderTop: '1px solid #eee', textAlign: 'center' }}>
-            <p style={{ margin: 0, fontSize: '10px', color: '#aaa', fontWeight: 700, letterSpacing: '1px', fontFamily: 'sans-serif' }}>PAINEL OPERACIONAL SÃO LUIZ EXPRESS • 2026</p>
+          <div style={{ marginTop: '20px', borderTop: '1px solid #eee', paddingTop: '10px', textAlign: 'center' }}>
+             <p style={{ margin: 0, fontSize: '9px', color: '#aaa', fontWeight: 700, textTransform: 'uppercase' }}>PAINEL OPERACIONAL SÃO LUIZ EXPRESS</p>
           </div>
         </div>
       </div>
 
-      {/* Main Interface */}
+      {/* Main Interface Content */}
       <div className="bg-white px-6 py-3 rounded-lg shadow-sm border border-gray-200 flex flex-col md:flex-row justify-between items-center gap-4">
         <div className="flex items-center text-[#2E31B4]">
           <Clock className="w-5 h-5 mr-2" />
@@ -260,7 +258,6 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, onSelectUnit
                />
             </div>
             <div className="flex items-center text-gray-500 text-xs bg-blue-50 px-3 py-1.5 rounded-full border border-blue-100">
-               <Info className="w-3 h-3 mr-1" />
                <span className="font-semibold text-blue-800 uppercase">Dias Úteis: {fixedDays.elapsed} / {fixedDays.total}</span>
             </div>
             <div className="flex items-center space-x-2 bg-gray-50 p-1.5 rounded-lg border border-gray-200">
