@@ -293,27 +293,28 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, onSelectUnit
         <div className="p-5 border-b bg-gray-50 flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-4">
              <Filter className="text-[#2E31B4] w-5 h-5"/>
-             <h3 className="font-bold text-[#0F103A] text-lg uppercase tracking-wide">Ranking Geral</h3>
+             <h3 className="font-bold text-[#0F103A] text-lg uppercase tracking-wide">Ranking Geral de Unidades</h3>
           </div>
           <div className="flex gap-4 w-full md:w-auto">
              <div className="relative group">
-                <button className="flex items-center space-x-2 text-sm text-gray-600 bg-white px-4 py-2 rounded-full border border-gray-200 shadow-sm">
+                <button className="flex items-center space-x-2 text-sm text-gray-600 bg-white px-4 py-2 rounded-full border border-gray-200 shadow-sm transition-all hover:bg-gray-50">
                    <ArrowUpDown className="w-4 h-4" />
                    <span className="font-medium">Ordenar</span>
                    <ChevronDown className="w-3 h-3" />
                 </button>
-                <div className="absolute top-full right-0 mt-2 w-56 bg-white border rounded-lg shadow-xl hidden group-hover:block z-20">
+                <div className="absolute top-full right-0 mt-2 w-56 bg-white border rounded-lg shadow-xl hidden group-hover:block z-20 overflow-hidden">
                    <div className="py-1">
-                      <button onClick={() => { setSortField('faturamento'); setSortDirection('desc'); }} className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-50">Maior Faturamento</button>
-                      <button onClick={() => { setSortField('projecao'); setSortDirection('desc'); }} className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-50">Maior % Projeção</button>
-                      <button onClick={() => { setSortField('noPrazo'); setSortDirection('desc'); }} className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-50">Maior % Entregas OK</button>
-                      <button onClick={() => { setSortField('semMdfe'); setSortDirection('desc'); }} className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-50">Maior % Sem MDFE</button>
+                      <button onClick={() => { setSortField('faturamento'); setSortDirection('desc'); }} className="block w-full text-left px-4 py-2 text-sm hover:bg-blue-50">Maior Faturamento</button>
+                      <button onClick={() => { setSortField('projecao'); setSortDirection('desc'); }} className="block w-full text-left px-4 py-2 text-sm hover:bg-blue-50">Maior % Projeção</button>
+                      <button onClick={() => { setSortField('noPrazo'); setSortDirection('desc'); }} className="block w-full text-left px-4 py-2 text-sm hover:bg-blue-50">Maior % Entregas OK</button>
+                      <button onClick={() => { setSortField('semMdfe'); setSortDirection('desc'); }} className="block w-full text-left px-4 py-2 text-sm hover:bg-blue-50">Maior % Sem MDFE</button>
+                      <button onClick={() => { setSortField('semBaixa'); setSortDirection('desc'); }} className="block w-full text-left px-4 py-2 text-sm hover:bg-blue-50">Mais Pendências</button>
                    </div>
                 </div>
              </div>
              <div className="relative flex-grow">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <input type="text" placeholder="Buscar unidade..." className="pl-10 pr-4 py-2 border rounded-full text-sm w-full md:w-64" value={filter} onChange={(e) => setFilter(e.target.value)} />
+                <input type="text" placeholder="Buscar unidade..." className="pl-10 pr-4 py-2 border rounded-full text-sm w-full md:w-64 focus:ring-2 focus:ring-[#2E31B4] outline-none" value={filter} onChange={(e) => setFilter(e.target.value)} />
              </div>
           </div>
         </div>
@@ -322,12 +323,12 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, onSelectUnit
           <table className="min-w-full text-sm">
             <thead className="bg-[#E8E8F9] text-[#24268B]">
                <tr>
-                 <th className="px-6 py-4 text-left font-bold cursor-pointer" onClick={() => handleSort('unidade')}>Unidade</th>
-                 <th className="px-6 py-4 text-right font-bold cursor-pointer" onClick={() => handleSort('projecao')}>% Projeção</th>
-                 <th className="px-6 py-4 text-right font-bold hidden md:table-cell cursor-pointer" onClick={() => handleSort('faturamento')}>Faturamento</th>
-                 <th className="px-6 py-4 text-center font-bold cursor-pointer" onClick={() => handleSort('noPrazo')}>% Entregas OK</th>
-                 <th className="px-6 py-4 text-center font-bold cursor-pointer" onClick={() => handleSort('semBaixa')}>Pendências</th>
-                 <th className="px-6 py-4 text-center font-bold cursor-pointer" onClick={() => handleSort('semMdfe')}>% Sem MDFE</th>
+                 <th className="px-6 py-4 text-left font-bold cursor-pointer hover:bg-blue-100" onClick={() => handleSort('unidade')}>Unidade</th>
+                 <th className="px-6 py-4 text-right font-bold cursor-pointer hover:bg-blue-100" onClick={() => handleSort('projecao')}>% Projeção</th>
+                 <th className="px-6 py-4 text-right font-bold hidden md:table-cell cursor-pointer hover:bg-blue-100" onClick={() => handleSort('faturamento')}>Faturamento</th>
+                 <th className="px-6 py-4 text-center font-bold cursor-pointer hover:bg-blue-100" onClick={() => handleSort('noPrazo')}>% Entregas OK</th>
+                 <th className="px-6 py-4 text-center font-bold cursor-pointer hover:bg-blue-100" onClick={() => handleSort('semBaixa')}>Pendências</th>
+                 <th className="px-6 py-4 text-center font-bold cursor-pointer hover:bg-blue-100" onClick={() => handleSort('semMdfe')}>% Sem MDFE</th>
                </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -338,7 +339,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, onSelectUnit
                  const pM = tM > 0 ? (stat.semMdfe / tM) * 100 : 0;
 
                  return (
-                   <tr key={stat.unidade} onClick={() => onSelectUnit(stat.unidade)} className="hover:bg-blue-50 cursor-pointer transition-colors group">
+                   <tr key={stat.unidade} onClick={() => onSelectUnit(stat.unidade)} className="hover:bg-blue-50 cursor-pointer group">
                      <td className="px-6 py-4 font-bold text-[#0F103A] group-hover:text-[#2E31B4]">{stat.unidade}</td>
                      <td className="px-6 py-4 text-right">
                        <span className={`px-2 py-1 rounded text-xs font-bold ${stat.percentualProjecao >= 100 ? 'bg-green-100 text-green-700' : stat.percentualProjecao >= 95 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
