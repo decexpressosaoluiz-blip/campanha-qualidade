@@ -101,37 +101,37 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col gap-4">
-        <div className="flex justify-end items-center space-x-3">
+        <div className="flex flex-col sm:flex-row justify-end items-center gap-2">
           <button 
             onClick={() => downloadXLS(currentDocs, `Relatorio_${stats.unidade}_${activeTab}`)}
-            className="flex items-center px-5 py-2 bg-[#059669] hover:bg-[#047857] text-white rounded font-bold text-xs transition-all shadow-md active:scale-95"
+            className="w-full sm:w-auto flex items-center justify-center px-5 py-2.5 bg-[#059669] hover:bg-[#047857] text-white rounded font-bold text-xs transition-all shadow-md active:scale-95"
           >
-            <Download className="w-3.5 h-3.5 mr-2" />
+            <Download className="w-4 h-4 mr-2" />
             EXPORTAR EXCEL
           </button>
           <a 
             href={LINKS.PENDENCIAS}
             target="_blank"
             rel="noreferrer"
-            className="flex items-center px-5 py-2 bg-[#EC1B23] hover:bg-[#C41017] text-white rounded font-bold text-xs transition-all shadow-md active:scale-95 uppercase"
+            className="w-full sm:w-auto flex items-center justify-center px-5 py-2.5 bg-[#EC1B23] hover:bg-[#C41017] text-white rounded font-bold text-xs transition-all shadow-md active:scale-95 uppercase"
           >
-            <ExternalLink className="w-3.5 h-3.5 mr-2" />
+            <ExternalLink className="w-4 h-4 mr-2" />
             CONSULTAR PENDÊNCIAS
           </a>
         </div>
         
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between border-b border-gray-200 pb-2">
-          <h2 className="text-2xl font-medium text-[#0F103A] tracking-tight">
+          <h2 className="text-xl sm:text-2xl font-medium text-[#0F103A] tracking-tight">
             Painel: {stats.unidade}
           </h2>
-          <div className="flex items-center text-[#2E31B4] text-xs font-semibold mt-2 sm:mt-0">
-            <Clock className="w-4 h-4 mr-2" />
+          <div className="flex items-center text-[#2E31B4] text-[10px] sm:text-xs font-semibold mt-1 sm:mt-0">
+            <Clock className="w-3.5 h-3.5 mr-1.5" />
             <span>Atualizado: {lastUpdate.toLocaleDateString('pt-BR')}</span>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
         <Card 
           title="VENDAS" 
           icon={<DollarSign className="w-5 h-5" />}
@@ -181,108 +181,108 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
         </Card>
 
         <Card title="BAIXAS" icon={<Truck className="w-5 h-5" />} className="border-l-gray-300">
-          <div className="flex justify-between gap-2 py-1 h-[140px]">
+          <div className="flex justify-between gap-1.5 py-1 min-h-[140px]">
             <button 
               onClick={(e) => { e.stopPropagation(); setActiveTab('baixas'); setBaixaFilter('noPrazo'); }}
-              className={`flex-1 flex flex-col items-center justify-center p-2 rounded transition border hover:bg-green-100 active:scale-95 shadow-sm ${getCardStatusColor(true, false)}`}
+              className={`flex-1 flex flex-col items-center justify-center p-1 rounded transition border hover:bg-green-100 active:scale-95 shadow-sm ${getCardStatusColor(true, false)}`}
             >
-              <CheckCircle className="w-5 h-5 text-green-600 mb-2" />
-              <span className="text-2xl font-black text-green-700 leading-none">{stats.baixaNoPrazo}</span>
-              <span className="text-[9px] font-black text-green-800 uppercase mt-2">NO PRAZO</span>
-              <span className="text-[10px] text-green-600 font-bold">{pctNoPrazo.toFixed(0)}%</span>
+              <CheckCircle className="w-4 h-4 text-green-600 mb-1.5" />
+              <span className="text-xl font-black text-green-700 leading-none">{stats.baixaNoPrazo}</span>
+              <span className="text-[8px] sm:text-[9px] font-black text-green-800 uppercase mt-1 text-center">NO PRAZO</span>
+              <span className="text-[9px] text-green-600 font-bold">{pctNoPrazo.toFixed(0)}%</span>
             </button>
 
             <button 
                onClick={(e) => { e.stopPropagation(); setActiveTab('baixas'); setBaixaFilter('semBaixa'); }}
-               className={`flex-1 flex flex-col items-center justify-center p-2 rounded transition border hover:bg-yellow-100 active:scale-95 shadow-sm ${getCardStatusColor(false, true)}`}
+               className={`flex-1 flex flex-col items-center justify-center p-1 rounded transition border hover:bg-yellow-100 active:scale-95 shadow-sm ${getCardStatusColor(false, true)}`}
             >
-              <AlertTriangle className="w-5 h-5 text-yellow-600 mb-2" />
-              <span className="text-2xl font-black text-yellow-700 leading-none">{stats.semBaixa}</span>
-              <span className="text-[9px] font-black text-yellow-800 uppercase mt-2">SEM BAIXA</span>
-              <span className="text-[10px] text-yellow-600 font-bold">{pctSemBaixa.toFixed(0)}%</span>
+              <AlertTriangle className="w-4 h-4 text-yellow-600 mb-1.5" />
+              <span className="text-xl font-black text-yellow-700 leading-none">{stats.semBaixa}</span>
+              <span className="text-[8px] sm:text-[9px] font-black text-yellow-800 uppercase mt-1 text-center">SEM BAIXA</span>
+              <span className="text-[9px] text-yellow-600 font-bold">{pctSemBaixa.toFixed(0)}%</span>
             </button>
 
             <button 
                onClick={(e) => { e.stopPropagation(); setActiveTab('baixas'); setBaixaFilter('foraPrazo'); }}
-               className={`flex-1 flex flex-col items-center justify-center p-2 rounded transition border hover:bg-red-100 active:scale-95 shadow-sm ${getCardStatusColor(false, false)}`}
+               className={`flex-1 flex flex-col items-center justify-center p-1 rounded transition border hover:bg-red-100 active:scale-95 shadow-sm ${getCardStatusColor(false, false)}`}
             >
-              <XCircle className="w-5 h-5 text-red-600 mb-2" />
-              <span className="text-2xl font-black text-red-700 leading-none">{stats.baixaForaPrazo}</span>
-              <span className="text-[9px] font-black text-red-800 uppercase mt-2 leading-tight text-center">FORA PRAZO</span>
-              <span className="text-[10px] text-red-600 font-bold">{pctForaPrazo.toFixed(0)}%</span>
+              <XCircle className="w-4 h-4 text-red-600 mb-1.5" />
+              <span className="text-xl font-black text-red-700 leading-none">{stats.baixaForaPrazo}</span>
+              <span className="text-[8px] sm:text-[9px] font-black text-red-800 uppercase mt-1 leading-tight text-center">FORA PRAZO</span>
+              <span className="text-[9px] text-red-600 font-bold">{pctForaPrazo.toFixed(0)}%</span>
             </button>
           </div>
         </Card>
 
         <Card title="MANIFESTOS" icon={<FileText className="w-5 h-5" />} className="border-l-blue-500">
-           <div className="flex flex-col gap-3 py-1 h-[140px] justify-center">
+           <div className="flex flex-col gap-2 py-1 min-h-[140px] justify-center">
              <button 
                 onClick={(e) => { e.stopPropagation(); setActiveTab('manifestos'); setMdfeFilter('comMdfe'); }}
-                className="flex justify-between items-center p-4 rounded bg-green-50/50 border border-green-200 hover:bg-green-100 hover:border-green-300 transition-all text-left w-full group shadow-sm"
+                className="flex justify-between items-center p-3 rounded bg-green-50/50 border border-green-200 hover:bg-green-100 hover:border-green-300 transition-all text-left w-full group shadow-sm"
              >
                 <div className="flex flex-col">
-                  <span className="text-[10px] font-black text-green-800 uppercase tracking-wider">Com MDFE</span>
-                  <span className="text-[10px] text-green-600 font-bold">{pctComMdfe.toFixed(0)}% cobertura</span>
+                  <span className="text-[9px] font-black text-green-800 uppercase tracking-wider">Com MDFE</span>
+                  <span className="text-[9px] text-green-600 font-bold">{pctComMdfe.toFixed(0)}% cobertura</span>
                 </div>
-                <span className="font-black text-2xl text-green-600">{stats.comMdfe}</span>
+                <span className="font-black text-xl text-green-600">{stats.comMdfe}</span>
              </button>
              
              <button 
                 onClick={(e) => { e.stopPropagation(); setActiveTab('manifestos'); setMdfeFilter('semMdfe'); }}
-                className="flex justify-between items-center p-4 rounded bg-red-50/50 border border-red-200 hover:bg-red-100 hover:border-red-300 transition-all text-left w-full group shadow-sm"
+                className="flex justify-between items-center p-3 rounded bg-red-50/50 border border-red-200 hover:bg-red-100 hover:border-red-300 transition-all text-left w-full group shadow-sm"
              >
                 <div className="flex flex-col">
-                  <span className="text-[10px] font-black text-red-800 uppercase tracking-wider">SEM MDFE</span>
-                  <span className="text-[10px] text-red-600 font-bold">{pctSemMdfe.toFixed(0)}% pendente</span>
+                  <span className="text-[9px] font-black text-red-800 uppercase tracking-wider">SEM MDFE</span>
+                  <span className="text-[9px] text-red-600 font-bold">{pctSemMdfe.toFixed(0)}% pendente</span>
                 </div>
-                <span className="font-black text-2xl text-red-600">{stats.semMdfe}</span>
+                <span className="font-black text-xl text-red-600">{stats.semMdfe}</span>
              </button>
            </div>
         </Card>
       </div>
 
-      <div className="bg-white rounded-lg shadow-lg overflow-hidden border border-gray-100 mt-8">
-        <div className="p-4 bg-gray-50 border-b flex flex-col sm:flex-row justify-between items-center gap-4">
-          <h3 className="font-bold text-[#0F103A] uppercase tracking-wide text-[10px]">
+      <div className="bg-white rounded-lg shadow-lg overflow-hidden border border-gray-100 mt-6">
+        <div className="p-3 bg-gray-50 border-b flex flex-col sm:flex-row justify-between items-center gap-3">
+          <h3 className="font-bold text-[#0F103A] uppercase tracking-wide text-[9px] sm:text-[10px] text-center sm:text-left">
             LISTAGEM: {activeTab === 'vendas' ? 'Vendas do Mês' : activeTab === 'baixas' ? 'Status de Entrega' : 'Controle de MDFE'}
           </h3>
           
-          <div className="flex space-x-1 text-[10px]">
+          <div className="flex flex-wrap justify-center gap-1 text-[8px] sm:text-[10px]">
             {activeTab === 'baixas' ? (
               <>
-                <button onClick={() => setBaixaFilter('all')} className={`px-3 py-1 rounded-full transition font-bold ${baixaFilter === 'all' ? 'bg-[#2E31B4] text-white shadow' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}>TODOS</button>
-                <button onClick={() => setBaixaFilter('noPrazo')} className={`px-3 py-1 rounded-full transition font-bold ${baixaFilter === 'noPrazo' ? 'bg-green-600 text-white shadow' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}>NO PRAZO</button>
-                <button onClick={() => setBaixaFilter('foraPrazo')} className={`px-3 py-1 rounded-full transition font-bold ${baixaFilter === 'foraPrazo' ? 'bg-red-600 text-white shadow' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}>ATRASADOS</button>
-                <button onClick={() => setBaixaFilter('semBaixa')} className={`px-3 py-1 rounded-full transition font-bold ${baixaFilter === 'semBaixa' ? 'bg-yellow-500 text-white shadow' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}>PENDENTES</button>
+                <button onClick={() => setBaixaFilter('all')} className={`px-2.5 py-1 rounded-full transition font-bold ${baixaFilter === 'all' ? 'bg-[#2E31B4] text-white shadow' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}>TODOS</button>
+                <button onClick={() => setBaixaFilter('noPrazo')} className={`px-2.5 py-1 rounded-full transition font-bold ${baixaFilter === 'noPrazo' ? 'bg-green-600 text-white shadow' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}>NO PRAZO</button>
+                <button onClick={() => setBaixaFilter('foraPrazo')} className={`px-2.5 py-1 rounded-full transition font-bold ${baixaFilter === 'foraPrazo' ? 'bg-red-600 text-white shadow' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}>ATRASADOS</button>
+                <button onClick={() => setBaixaFilter('semBaixa')} className={`px-2.5 py-1 rounded-full transition font-bold ${baixaFilter === 'semBaixa' ? 'bg-yellow-500 text-white shadow' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}>PENDENTES</button>
               </>
             ) : activeTab === 'manifestos' ? (
               <>
-                <button onClick={() => setMdfeFilter('all')} className={`px-3 py-1 rounded-full transition font-bold ${mdfeFilter === 'all' ? 'bg-[#2E31B4] text-white shadow' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}>TODOS</button>
-                <button onClick={() => setMdfeFilter('comMdfe')} className={`px-3 py-1 rounded-full transition font-bold ${mdfeFilter === 'comMdfe' ? 'bg-green-600 text-white shadow' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}>COM MDFE</button>
-                <button onClick={() => setMdfeFilter('semMdfe')} className={`px-3 py-1 rounded-full transition font-bold ${mdfeFilter === 'semMdfe' ? 'bg-red-600 text-white shadow' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}>SEM MDFE</button>
+                <button onClick={() => setMdfeFilter('all')} className={`px-2.5 py-1 rounded-full transition font-bold ${mdfeFilter === 'all' ? 'bg-[#2E31B4] text-white shadow' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}>TODOS</button>
+                <button onClick={() => setMdfeFilter('comMdfe')} className={`px-2.5 py-1 rounded-full transition font-bold ${mdfeFilter === 'comMdfe' ? 'bg-green-600 text-white shadow' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}>COM MDFE</button>
+                <button onClick={() => setMdfeFilter('semMdfe')} className={`px-2.5 py-1 rounded-full transition font-bold ${mdfeFilter === 'semMdfe' ? 'bg-red-600 text-white shadow' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}>SEM MDFE</button>
               </>
             ) : null}
           </div>
         </div>
         
         <div className="overflow-x-auto">
-          <table className="min-w-full text-xs">
+          <table className="w-full text-[10px] sm:text-xs">
             <thead className="bg-[#E8E8F9] text-[#24268B]">
               <tr>
-                <th onClick={() => handleSort('data')} className="px-4 py-3 text-left font-bold cursor-pointer hover:bg-blue-100 transition">
-                  <div className="flex items-center">DATA <ArrowUpDown className="w-3 h-3 ml-1 opacity-50"/></div>
+                <th onClick={() => handleSort('data')} className="px-2 py-3 text-left font-bold cursor-pointer hover:bg-blue-100 transition whitespace-nowrap">
+                  <div className="flex items-center">DATA <ArrowUpDown className="w-2.5 h-2.5 ml-0.5 opacity-50"/></div>
                 </th>
-                <th onClick={() => handleSort('id')} className="px-4 py-3 text-left font-bold cursor-pointer hover:bg-blue-100 transition">
-                  <div className="flex items-center">CTE <ArrowUpDown className="w-3 h-3 ml-1 opacity-50"/></div>
+                <th onClick={() => handleSort('id')} className="px-2 py-3 text-left font-bold cursor-pointer hover:bg-blue-100 transition whitespace-nowrap">
+                  <div className="flex items-center">CTE <ArrowUpDown className="w-2.5 h-2.5 ml-0.5 opacity-50"/></div>
                 </th>
-                <th onClick={() => handleSort('valor')} className="px-4 py-3 text-right font-bold cursor-pointer hover:bg-blue-100 transition">
-                  <div className="flex items-center justify-end">VALOR <ArrowUpDown className="w-3 h-3 ml-1 opacity-50"/></div>
+                <th onClick={() => handleSort('valor')} className="px-2 py-3 text-right font-bold cursor-pointer hover:bg-blue-100 transition whitespace-nowrap">
+                  <div className="flex items-center justify-end">VALOR <ArrowUpDown className="w-2.5 h-2.5 ml-0.5 opacity-50"/></div>
                 </th>
-                <th onClick={() => handleSort('statusPrazo')} className="px-4 py-3 text-center font-bold cursor-pointer hover:bg-blue-100 transition">
-                  <div className="flex items-center justify-center">STATUS PRAZO <ArrowUpDown className="w-3 h-3 ml-1 opacity-50"/></div>
+                <th onClick={() => handleSort('statusPrazo')} className="px-2 py-3 text-center font-bold cursor-pointer hover:bg-blue-100 transition whitespace-nowrap">
+                  <div className="flex items-center justify-center">STATUS <ArrowUpDown className="w-2.5 h-2.5 ml-0.5 opacity-50"/></div>
                 </th>
-                <th onClick={() => handleSort('statusMdfe')} className="px-4 py-3 text-center font-bold cursor-pointer hover:bg-blue-100 transition">
-                  <div className="flex items-center justify-center">MDFE <ArrowUpDown className="w-3 h-3 ml-1 opacity-50"/></div>
+                <th onClick={() => handleSort('statusMdfe')} className="px-2 py-3 text-center font-bold cursor-pointer hover:bg-blue-100 transition whitespace-nowrap">
+                  <div className="flex items-center justify-center">MDFE <ArrowUpDown className="w-2.5 h-2.5 ml-0.5 opacity-50"/></div>
                 </th>
               </tr>
             </thead>
@@ -290,24 +290,24 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
               {currentDocs.length > 0 ? (
                 currentDocs.map((doc, idx) => (
                   <tr key={idx} className="hover:bg-blue-50 transition-colors group">
-                    <td className="px-4 py-3 whitespace-nowrap text-gray-600">{doc.data.toLocaleDateString('pt-BR')}</td>
-                    <td className="px-4 py-3 font-medium text-[#2E31B4]">{doc.id}</td>
-                    <td className="px-4 py-3 text-right font-medium text-gray-700">{doc.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wide border
+                    <td className="px-2 py-2.5 whitespace-nowrap text-gray-600">{doc.data.toLocaleDateString('pt-BR')}</td>
+                    <td className="px-2 py-2.5 font-medium text-[#2E31B4] whitespace-nowrap">{doc.id}</td>
+                    <td className="px-2 py-2.5 text-right font-medium text-gray-700 whitespace-nowrap">{doc.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0 })}</td>
+                    <td className="px-2 py-2.5 text-center">
+                      <span className={`inline-block px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tight border whitespace-nowrap
                         ${doc.statusPrazo?.toUpperCase() === 'NO PRAZO' ? 'bg-green-50 text-green-700 border-green-200' : 
                           doc.statusPrazo?.toUpperCase() === 'FORA DO PRAZO' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-yellow-50 text-yellow-700 border-yellow-200'
                         }`}>
-                        {doc.statusPrazo || 'PENDENTE'}
+                        {doc.statusPrazo === 'NO PRAZO' ? 'OK' : doc.statusPrazo === 'FORA DO PRAZO' ? 'ATRASO' : 'PEND'}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={`px-2 py-0.5 rounded text-[9px] font-black border uppercase
+                    <td className="px-2 py-2.5 text-center">
+                      <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-black border uppercase whitespace-nowrap
                          ${(doc.statusMdfe?.toUpperCase().includes('ENCERRADO') || doc.statusMdfe?.toUpperCase().includes('AUTORIZADO') || doc.statusMdfe?.toUpperCase().includes('COM MDFE')) 
                            ? 'bg-green-50 text-green-600 border-green-200' 
                            : 'bg-red-50 text-red-600 border-red-200'}
                       `}>
-                        {doc.statusMdfe || 'SEM MDFE'}
+                        {(doc.statusMdfe?.toUpperCase().includes('ENCERRADO') || doc.statusMdfe?.toUpperCase().includes('AUTORIZADO') || doc.statusMdfe?.toUpperCase().includes('COM MDFE')) ? 'SIM' : 'NÃO'}
                       </span>
                     </td>
                   </tr>
