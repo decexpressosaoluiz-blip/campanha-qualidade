@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { User, AppData, DashboardView } from './types.ts';
-import { CSV_URLS } from './constants.ts';
-import { fetchCsv } from './services/csvService.ts';
-import { calculateStats, normalizeUnitName, parseCurrency, parseDate } from './services/calculationService.ts';
-import Layout from './components/Layout.tsx';
-import Login from './components/Login.tsx';
-import ManagerDashboard from './components/ManagerDashboard.tsx';
-import UnitDashboard from './components/UnitDashboard.tsx';
+import { User, AppData, DashboardView } from './types';
+import { CSV_URLS } from './constants';
+import { fetchCsv } from './services/csvService';
+import { calculateStats, normalizeUnitName, parseCurrency, parseDate } from './services/calculationService';
+import Layout from './components/Layout';
+import Login from './components/Login';
+import ManagerDashboard from './components/ManagerDashboard';
+import UnitDashboard from './components/UnitDashboard';
 import { Loader2 } from 'lucide-react';
 
 const App: React.FC = () => {
