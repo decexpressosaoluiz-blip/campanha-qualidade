@@ -145,7 +145,7 @@ const App: React.FC = () => {
     }
     if (view === DashboardView.UNIT_DETAIL && data && selectedUnit) {
       const stats = calculateStats(data, selectedUnit, { start: dateRange.start ? new Date(dateRange.start) : null, end: dateRange.end ? new Date(dateRange.end) : null });
-      return <UnitDashboard stats={stats[0]} user={user} onBack={() => setView(DashboardView.MANAGER)} setHeaderActions={setHeaderActions} />;
+      return <UnitDashboard stats={stats[0]} user={user} onBack={() => setView(DashboardView.MANAGER)} setHeaderActions={setHeaderActions} lastUpdate={data.lastUpdate} />;
     }
     return null;
   };

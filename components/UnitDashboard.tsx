@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { UnitStats, Cte, User } from '../types';
 import Card from './Card';
-import { DollarSign, Truck, FileText, CheckCircle, AlertTriangle, XCircle, Download, ArrowUpDown, ExternalLink } from 'lucide-react';
+import { DollarSign, Truck, FileText, CheckCircle, AlertTriangle, XCircle, Download, ArrowUpDown, ExternalLink, Clock } from 'lucide-react';
 import { downloadXLS } from '../services/excelService';
 import { LINKS } from '../constants';
 
@@ -11,13 +11,14 @@ interface UnitDashboardProps {
   onBack: () => void;
   user: User | null;
   setHeaderActions: (actions: React.ReactNode) => void;
+  lastUpdate: Date;
 }
 
 type TabType = 'vendas' | 'baixas' | 'manifestos';
 type SortKey = 'data' | 'id' | 'valor' | 'statusPrazo' | 'statusMdfe';
 type SortDirection = 'asc' | 'desc';
 
-const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderActions }) => {
+const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderActions, lastUpdate }) => {
   const [activeTab, setActiveTab] = useState<TabType>('vendas');
   const [baixaFilter, setBaixaFilter] = useState<'all' | 'noPrazo' | 'foraPrazo' | 'semBaixa'>('all');
   const [mdfeFilter, setMdfeFilter] = useState<'all' | 'comMdfe' | 'semMdfe'>('all');
@@ -53,7 +54,6 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
   const currentDocs = getDocuments();
 
   useEffect(() => {
-    // Cabeçalho vazio aqui para evitar botões duplicados no Layout (escuro)
     setHeaderActions(null);
   }, [setHeaderActions]);
 
@@ -71,9 +71,9 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
   };
   
   const getProjBarOpacityColor = (pct: number) => {
-    if (pct >= 100) return 'bg-green-500';
-    if (pct >= 95) return 'bg-yellow-500';
-    return 'bg-red-500';
+    if (pct >= 100) return 'bg-green-50';
+    if (pct >= 95) return 'bg-yellow-50';
+    return 'bg-red-50';
   };
 
   const getCardStatusColor = (isGood: boolean, isWarn: boolean) => {
@@ -100,7 +100,6 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* NOVO HEADER: Botões alinhados SUPERIOR ao nome da unidade */}
       <div className="flex flex-col gap-4">
         <div className="flex justify-end items-center space-x-3">
           <button 
@@ -121,14 +120,18 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
           </a>
         </div>
         
-        <h2 className="text-2xl font-medium text-[#0F103A] tracking-tight border-b border-gray-200 pb-2">
-          Painel: {stats.unidade}
-        </h2>
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between border-b border-gray-200 pb-2">
+          <h2 className="text-2xl font-medium text-[#0F103A] tracking-tight">
+            Painel: {stats.unidade}
+          </h2>
+          <div className="flex items-center text-[#2E31B4] text-xs font-semibold mt-2 sm:mt-0">
+            <Clock className="w-4 h-4 mr-2" />
+            <span>Atualizado: {lastUpdate.toLocaleDateString('pt-BR')}</span>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        
-        {/* Card Vendas - Ajustado para TOTAL RECEBIDO */}
         <Card 
           title="VENDAS" 
           icon={<DollarSign className="w-5 h-5" />}
@@ -177,7 +180,6 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
           </div>
         </Card>
 
-        {/* Card Baixas - Layout Corrigido (Horizontal) */}
         <Card title="BAIXAS" icon={<Truck className="w-5 h-5" />} className="border-l-gray-300">
           <div className="flex justify-between gap-2 py-1 h-[140px]">
             <button 
@@ -212,7 +214,6 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
           </div>
         </Card>
 
-        {/* Card Manifestos */}
         <Card title="MANIFESTOS" icon={<FileText className="w-5 h-5" />} className="border-l-blue-500">
            <div className="flex flex-col gap-3 py-1 h-[140px] justify-center">
              <button 
@@ -240,7 +241,6 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
         </Card>
       </div>
 
-      {/* Tabela de Listagem */}
       <div className="bg-white rounded-lg shadow-lg overflow-hidden border border-gray-100 mt-8">
         <div className="p-4 bg-gray-50 border-b flex flex-col sm:flex-row justify-between items-center gap-4">
           <h3 className="font-bold text-[#0F103A] uppercase tracking-wide text-[10px]">
