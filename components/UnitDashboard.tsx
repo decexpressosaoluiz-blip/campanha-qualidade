@@ -1,10 +1,11 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { UnitStats, Cte, User } from '../types';
 import Card from './Card';
-import { DollarSign, Truck, FileText, CheckCircle, AlertTriangle, XCircle, Download, ArrowUpDown, ExternalLink, Clock } from 'lucide-react';
+import { DollarSign, Truck, FileText, CheckCircle, AlertTriangle, XCircle, Download, ArrowUpDown, ExternalLink, Clock, ArrowUp, ArrowDown } from 'lucide-react';
 import { downloadXLS } from '../services/excelService';
 import { LINKS } from '../constants';
+import { normalizeStatus } from '../services/calculationService';
 
 interface UnitDashboardProps {
   stats: UnitStats;
@@ -12,26 +13,29 @@ interface UnitDashboardProps {
   user: User | null;
   setHeaderActions: (actions: React.ReactNode) => void;
   lastUpdate: Date;
+  allCtes: Cte[];
 }
 
 type TabType = 'vendas' | 'baixas' | 'manifestos';
 type SortKey = 'data' | 'id' | 'valor' | 'statusPrazo' | 'statusMdfe';
 type SortDirection = 'asc' | 'desc';
 
-const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderActions, lastUpdate }) => {
+const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderActions, lastUpdate, allCtes }) => {
   const [activeTab, setActiveTab] = useState<TabType>('vendas');
   const [baixaFilter, setBaixaFilter] = useState<'all' | 'noPrazo' | 'foraPrazo' | 'semBaixa'>('all');
   const [mdfeFilter, setMdfeFilter] = useState<'all' | 'comMdfe' | 'semMdfe'>('all');
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection }>({ key: 'data', direction: 'desc' });
+
+  const defaultDeliveryEnd = lastUpdate.toISOString().split('T')[0];
+  const [deliveryFilter, setDeliveryFilter] = useState({ start: '', end: defaultDeliveryEnd });
 
   const getDocuments = (): Cte[] => {
     let docs: Cte[] = [];
     switch (activeTab) {
       case 'vendas': docs = [...stats.docsVendas]; break;
       case 'baixas':
-        if (baixaFilter === 'all') {
-             docs = [...stats.docsSemBaixa, ...stats.docsBaixaForaPrazo, ...stats.docsBaixaNoPrazo];
-        } else if (baixaFilter === 'noPrazo') docs = [...stats.docsBaixaNoPrazo];
+        if (baixaFilter === 'all') docs = [...stats.docsSemBaixa, ...stats.docsBaixaForaPrazo, ...stats.docsBaixaNoPrazo];
+        else if (baixaFilter === 'noPrazo') docs = [...stats.docsBaixaNoPrazo];
         else if (baixaFilter === 'foraPrazo') docs = [...stats.docsBaixaForaPrazo];
         else if (baixaFilter === 'semBaixa') docs = [...stats.docsSemBaixa];
         break;
@@ -42,283 +46,204 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
         break;
     }
     return docs.sort((a, b) => {
-      let aVal: any = a[sortConfig.key];
-      let bVal: any = b[sortConfig.key];
-      if (sortConfig.key === 'id') { aVal = parseInt(a.id) || a.id; bVal = parseInt(b.id) || b.id; }
-      if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
-      if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
-      return 0;
+      let aVal: any = a[sortConfig.key], bVal: any = b[sortConfig.key];
+      if (sortConfig.key === 'id') { 
+        aVal = parseInt(a.id) || 0; 
+        bVal = parseInt(b.id) || 0; 
+      }
+      if (aVal === bVal) return 0;
+      const res = aVal < bVal ? -1 : 1;
+      return sortConfig.direction === 'asc' ? res : -res;
     });
   };
 
   const currentDocs = getDocuments();
 
-  useEffect(() => {
-    setHeaderActions(null);
-  }, [setHeaderActions]);
+  const unitDeliveryStats = useMemo(() => {
+    let countNoPrazo = 0, countForaPrazo = 0, countSemBaixa = 0;
+    const start = deliveryFilter.start ? new Date(deliveryFilter.start + 'T00:00:00') : null;
+    const end = deliveryFilter.end ? new Date(deliveryFilter.end + 'T23:59:59') : null;
 
-  // --- Visual Logic ---
-  const getProjColor = (pct: number) => {
-    if (pct >= 100) return 'text-green-600';
-    if (pct >= 95) return 'text-yellow-600';
-    return 'text-red-600';
-  };
+    allCtes.forEach(cte => {
+      if (!cte.prazoBaixa || cte.unidadeEntrega !== stats.unidade) return;
+      if (start && cte.prazoBaixa < start) return;
+      if (end && cte.prazoBaixa > end) return;
+      const status = normalizeStatus(cte.statusPrazo);
+      if (status === 'NO PRAZO') countNoPrazo++;
+      else if (status === 'FORA DO PRAZO') countForaPrazo++;
+      else countSemBaixa++;
+    });
 
-  const getProjBarColor = (pct: number) => {
-    if (pct >= 100) return 'bg-green-600';
-    if (pct >= 95) return 'bg-yellow-600';
-    return 'bg-red-600';
-  };
-  
-  const getProjBarOpacityColor = (pct: number) => {
-    if (pct >= 100) return 'bg-green-50';
-    if (pct >= 95) return 'bg-yellow-50';
-    return 'bg-red-50';
-  };
+    const total = countNoPrazo + countForaPrazo + countSemBaixa;
+    return { 
+      total, 
+      noPrazo: countNoPrazo, 
+      foraPrazo: countForaPrazo, 
+      semBaixa: countSemBaixa, 
+      pctNoPrazo: total > 0 ? (countNoPrazo / total) * 100 : 0,
+      pctSemBaixa: total > 0 ? (countSemBaixa / total) * 100 : 0,
+      pctForaPrazo: total > 0 ? (countForaPrazo / total) * 100 : 0
+    };
+  }, [allCtes, deliveryFilter, stats.unidade]);
 
-  const getCardStatusColor = (isGood: boolean, isWarn: boolean) => {
-    if (isGood) return 'border-green-500 bg-green-50/30';
-    if (isWarn) return 'border-yellow-500 bg-yellow-50/30';
-    return 'border-red-500 bg-red-50/30';
-  };
+  const handleSort = (key: SortKey) => setSortConfig(p => ({ key, direction: p.key === key && p.direction === 'asc' ? 'desc' : 'asc' }));
 
-  const handleSort = (key: SortKey) => {
-    setSortConfig(prev => ({
-      key,
-      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
-    }));
+  const SortIcon = ({ column }: { column: SortKey }) => {
+    if (sortConfig.key !== column) return <ArrowUpDown className="w-3 h-3 ml-1 opacity-20 group-hover:opacity-50 transition-opacity" />;
+    return sortConfig.direction === 'asc' ? <ArrowUp className="w-3 h-3 ml-1 text-sle-primary" /> : <ArrowDown className="w-3 h-3 ml-1 text-sle-primary" />;
   };
-  
-  const totalBaixas = stats.baixaNoPrazo + stats.baixaForaPrazo + stats.semBaixa;
-  const pctNoPrazo = totalBaixas ? (stats.baixaNoPrazo / totalBaixas) * 100 : 0;
-  const pctSemBaixa = totalBaixas ? (stats.semBaixa / totalBaixas) * 100 : 0;
-  const pctForaPrazo = totalBaixas ? (stats.baixaForaPrazo / totalBaixas) * 100 : 0;
-
-  const totalManifestos = stats.comMdfe + stats.semMdfe;
-  const pctComMdfe = totalManifestos ? (stats.comMdfe / totalManifestos) * 100 : 0;
-  const pctSemMdfe = totalManifestos ? (stats.semMdfe / totalManifestos) * 100 : 0;
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in pb-10 px-1 sm:px-0">
       <div className="flex flex-col gap-4">
         <div className="flex flex-col sm:flex-row justify-end items-center gap-2">
-          <button 
-            onClick={() => downloadXLS(currentDocs, `Relatorio_${stats.unidade}_${activeTab}`)}
-            className="w-full sm:w-auto flex items-center justify-center px-5 py-2.5 bg-[#059669] hover:bg-[#047857] text-white rounded font-bold text-xs transition-all shadow-md active:scale-95"
-          >
-            <Download className="w-4 h-4 mr-2" />
-            EXPORTAR EXCEL
+          <button onClick={() => downloadXLS(currentDocs, `Relatorio_${stats.unidade}`)} className="w-full sm:w-auto flex items-center justify-center px-4 py-2.5 bg-[#059669] text-white rounded font-semibold text-xs uppercase shadow-sm hover:bg-[#047857] active:scale-95 transition-all">
+            <Download className="w-4 h-4 mr-2" /> Exportar XLS
           </button>
-          <a 
-            href={LINKS.PENDENCIAS}
-            target="_blank"
-            rel="noreferrer"
-            className="w-full sm:w-auto flex items-center justify-center px-5 py-2.5 bg-[#EC1B23] hover:bg-[#C41017] text-white rounded font-bold text-xs transition-all shadow-md active:scale-95 uppercase"
-          >
-            <ExternalLink className="w-4 h-4 mr-2" />
-            CONSULTAR PENDÊNCIAS
+          <a href={LINKS.PENDENCIAS} target="_blank" rel="noreferrer" className="w-full sm:w-auto flex items-center justify-center px-4 py-2.5 bg-[#EC1B23] text-white rounded font-semibold text-xs uppercase shadow-sm hover:bg-[#C41017] active:scale-95 transition-all">
+            <ExternalLink className="w-4 h-4 mr-2" /> Consultar Pendências
           </a>
         </div>
-        
-        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between border-b border-gray-200 pb-2">
-          <h2 className="text-xl sm:text-2xl font-medium text-[#0F103A] tracking-tight">
-            Painel: {stats.unidade}
-          </h2>
-          <div className="flex items-center text-[#2E31B4] text-[10px] sm:text-xs font-semibold mt-1 sm:mt-0">
-            <Clock className="w-3.5 h-3.5 mr-1.5" />
-            <span>Atualizado: {lastUpdate.toLocaleDateString('pt-BR')}</span>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-gray-200 pb-3">
+          <h2 className="text-xl sm:text-2xl font-semibold text-[#0F103A] truncate tracking-tight">Painel: {stats.unidade}</h2>
+          <div className="flex items-center text-[#2E31B4] text-[10px] sm:text-xs font-medium uppercase mt-2 sm:mt-0 bg-blue-50 px-3 py-1 rounded-full">
+            <Clock className="w-3.5 h-3.5 mr-1.5" /> <span>Atualizado: {lastUpdate.toLocaleDateString('pt-BR')}</span>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
-        <Card 
-          title="VENDAS" 
-          icon={<DollarSign className="w-5 h-5" />}
-          className={`border-l-4 ${stats.percentualProjecao >= 100 ? 'border-green-500' : stats.percentualProjecao >= 95 ? 'border-yellow-500' : 'border-red-500'}`}
-          onClick={() => setActiveTab('vendas')}
-        >
-          <div className="flex flex-col gap-2">
-             <div className="overflow-hidden">
-               <span className="text-2xl font-black text-[#0F103A] block truncate leading-tight">
-                 {stats.faturamento.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-               </span>
-               <div className="text-[10px] font-bold text-gray-400 mt-0.5 uppercase">Meta: {stats.meta.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* VENDAS CARD */}
+        <Card title="VENDAS" icon={<DollarSign className="w-5 h-5 text-sle-primary opacity-60" />} className="border-l-sle-primary shadow-sm hover:shadow-md transition-shadow">
+          <div className="space-y-4">
+             <div>
+               <span className="text-3xl font-bold text-[#0F103A] tracking-tight">{stats.faturamento.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</span>
+               <div className="text-[10px] font-semibold text-gray-400 mt-1 uppercase tracking-wider">Meta: {stats.meta.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</div>
              </div>
              
-             <div className="space-y-1 bg-gray-50/50 p-2 rounded border border-gray-100">
-               <div className="flex justify-between items-center">
-                  <span className={`text-base font-black ${getProjColor(stats.percentualProjecao)}`}>
-                    {stats.percentualProjecao.toFixed(1)}%
-                  </span>
-                  <div className="text-right">
-                    <span className="text-[9px] uppercase text-gray-400 block font-bold">Projeção</span>
-                    <span className="text-xs font-bold text-gray-600">{stats.projecao.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+             <div className="bg-gray-50/50 p-3 rounded-lg border border-gray-100">
+                <div className="flex justify-between items-end mb-2">
+                   <div className="flex flex-col">
+                      <span className="text-[10px] uppercase text-gray-400 font-semibold tracking-wide">Projeção</span>
+                      <span className="font-bold text-sle-primary text-lg">{stats.projecao.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</span>
+                   </div>
+                   <span className={`text-lg font-bold ${stats.percentualProjecao >= 100 ? 'text-green-600' : 'text-red-600'}`}>{stats.percentualProjecao.toFixed(1)}%</span>
+                </div>
+                <div className="relative w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                    <div className={`absolute top-0 left-0 h-full transition-all duration-500 ${stats.percentualProjecao >= 100 ? 'bg-green-600' : 'bg-red-600'}`} style={{ width: `${Math.min((stats.faturamento / stats.meta) * 100, 100)}%` }}></div>
+                </div>
+             </div>
+
+             <div className="space-y-2">
+                <div className="bg-blue-50/40 border border-blue-100/50 rounded-lg p-2.5 flex justify-between items-center">
+                    <span className="text-[10px] font-semibold text-blue-800 uppercase tracking-tight">Vendas dia {lastUpdate.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'})}</span>
+                    <span className="text-sm font-bold text-[#2E31B4]">{stats.vendasDiaAnterior.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</span>
+                </div>
+                <div className="bg-orange-50/40 border border-orange-100/50 rounded-lg p-2.5 flex justify-between items-center">
+                    <span className="text-[10px] font-semibold text-orange-800 uppercase tracking-tight">Total Recebido</span>
+                    <span className="text-sm font-bold text-orange-700">{stats.recebido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</span>
+                </div>
+             </div>
+          </div>
+        </Card>
+
+        {/* BAIXAS CARD */}
+        <Card title="BAIXAS" icon={<Truck className="w-5 h-5 text-warning opacity-60" />} className="border-l-warning shadow-sm hover:shadow-md transition-shadow">
+           <div className="space-y-4">
+              <div className="flex items-center justify-between gap-2 p-2 bg-gray-50 rounded-lg border border-gray-100">
+                  <span className="text-[9px] font-semibold text-gray-400 uppercase tracking-tight">Filtro Prazo:</span>
+                  <div className="flex items-center gap-1">
+                     <input type="date" value={deliveryFilter.start} onChange={(e) => setDeliveryFilter(p => ({...p, start: e.target.value}))} className="bg-white border border-gray-200 rounded text-[10px] px-1.5 py-1 focus:ring-1 focus:ring-sle-primary outline-none" />
+                     <input type="date" value={deliveryFilter.end} onChange={(e) => setDeliveryFilter(p => ({...p, end: e.target.value}))} className="bg-white border border-gray-200 rounded text-[10px] px-1.5 py-1 focus:ring-1 focus:ring-sle-primary outline-none" />
                   </div>
-               </div>
-               
-               <div className="relative w-full h-2.5 bg-gray-200 rounded-full overflow-hidden">
-                  <div 
-                    className={`absolute top-0 left-0 h-full ${getProjBarOpacityColor(stats.percentualProjecao)}`} 
-                    style={{ width: `${Math.min(stats.percentualProjecao, 100)}%`, opacity: 0.4 }}
-                  ></div>
-                  <div 
-                    className={`absolute top-0 left-0 h-full ${getProjBarColor(stats.percentualProjecao)}`} 
-                    style={{ width: `${Math.min((stats.faturamento / stats.meta) * 100, 100)}%` }}
-                  ></div>
-               </div>
-             </div>
-
-             <div className="mt-1 pt-2 border-t border-dashed border-gray-200">
-                <div className="bg-orange-50 border border-orange-100 rounded p-2 flex justify-between items-center">
-                  <span className="text-[9px] font-black text-orange-800 uppercase leading-none">Total Recebido</span>
-                  <span className="text-xs font-black text-orange-700">
-                    {stats.recebido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                  </span>
+              </div>
+              <div className="flex gap-2 h-[100px]">
+                <div className="flex-1 flex flex-col items-center justify-center border border-green-100 bg-green-50/30 rounded-lg transition-transform hover:scale-[1.02]">
+                  <span className="text-xl font-bold text-green-700">{unitDeliveryStats.noPrazo}</span>
+                  <span className="text-[9px] font-semibold text-green-600 uppercase mt-1">{unitDeliveryStats.pctNoPrazo.toFixed(0)}% OK</span>
                 </div>
-             </div>
-          </div>
+                <div className="flex-1 flex flex-col items-center justify-center border border-yellow-200 bg-yellow-50/50 rounded-lg shadow-sm transition-transform hover:scale-[1.05] z-10">
+                  <span className="text-2xl font-bold text-yellow-700">{unitDeliveryStats.semBaixa}</span>
+                  <span className="text-[10px] font-bold text-yellow-600 uppercase mt-1 tracking-wide">{unitDeliveryStats.pctSemBaixa.toFixed(0)}% PEND</span>
+                </div>
+                <div className="flex-1 flex flex-col items-center justify-center border border-red-100 bg-red-50/30 rounded-lg transition-transform hover:scale-[1.02]">
+                  <span className="text-xl font-bold text-red-700">{unitDeliveryStats.foraPrazo}</span>
+                  <span className="text-[9px] font-semibold text-red-600 uppercase mt-1">{unitDeliveryStats.pctForaPrazo.toFixed(0)}% ATR</span>
+                </div>
+              </div>
+           </div>
         </Card>
 
-        <Card title="BAIXAS" icon={<Truck className="w-5 h-5" />} className="border-l-gray-300">
-          <div className="flex justify-between gap-1.5 py-1 min-h-[140px]">
-            <button 
-              onClick={(e) => { e.stopPropagation(); setActiveTab('baixas'); setBaixaFilter('noPrazo'); }}
-              className={`flex-1 flex flex-col items-center justify-center p-1 rounded transition border hover:bg-green-100 active:scale-95 shadow-sm ${getCardStatusColor(true, false)}`}
-            >
-              <CheckCircle className="w-4 h-4 text-green-600 mb-1.5" />
-              <span className="text-xl font-black text-green-700 leading-none">{stats.baixaNoPrazo}</span>
-              <span className="text-[8px] sm:text-[9px] font-black text-green-800 uppercase mt-1 text-center">NO PRAZO</span>
-              <span className="text-[9px] text-green-600 font-bold">{pctNoPrazo.toFixed(0)}%</span>
-            </button>
-
-            <button 
-               onClick={(e) => { e.stopPropagation(); setActiveTab('baixas'); setBaixaFilter('semBaixa'); }}
-               className={`flex-1 flex flex-col items-center justify-center p-1 rounded transition border hover:bg-yellow-100 active:scale-95 shadow-sm ${getCardStatusColor(false, true)}`}
-            >
-              <AlertTriangle className="w-4 h-4 text-yellow-600 mb-1.5" />
-              <span className="text-xl font-black text-yellow-700 leading-none">{stats.semBaixa}</span>
-              <span className="text-[8px] sm:text-[9px] font-black text-yellow-800 uppercase mt-1 text-center">SEM BAIXA</span>
-              <span className="text-[9px] text-yellow-600 font-bold">{pctSemBaixa.toFixed(0)}%</span>
-            </button>
-
-            <button 
-               onClick={(e) => { e.stopPropagation(); setActiveTab('baixas'); setBaixaFilter('foraPrazo'); }}
-               className={`flex-1 flex flex-col items-center justify-center p-1 rounded transition border hover:bg-red-100 active:scale-95 shadow-sm ${getCardStatusColor(false, false)}`}
-            >
-              <XCircle className="w-4 h-4 text-red-600 mb-1.5" />
-              <span className="text-xl font-black text-red-700 leading-none">{stats.baixaForaPrazo}</span>
-              <span className="text-[8px] sm:text-[9px] font-black text-red-800 uppercase mt-1 leading-tight text-center">FORA PRAZO</span>
-              <span className="text-[9px] text-red-600 font-bold">{pctForaPrazo.toFixed(0)}%</span>
-            </button>
-          </div>
-        </Card>
-
-        <Card title="MANIFESTOS" icon={<FileText className="w-5 h-5" />} className="border-l-blue-500">
-           <div className="flex flex-col gap-2 py-1 min-h-[140px] justify-center">
-             <button 
-                onClick={(e) => { e.stopPropagation(); setActiveTab('manifestos'); setMdfeFilter('comMdfe'); }}
-                className="flex justify-between items-center p-3 rounded bg-green-50/50 border border-green-200 hover:bg-green-100 hover:border-green-300 transition-all text-left w-full group shadow-sm"
-             >
+        {/* MANIFESTOS CARD */}
+        <Card title="MANIFESTOS" icon={<FileText className="w-5 h-5 text-danger opacity-60" />} className="border-l-danger shadow-sm hover:shadow-md transition-shadow">
+           <div className="flex flex-col gap-3 py-1 justify-center min-h-[140px]">
+             <div className="flex justify-between items-center p-4 rounded-lg bg-green-50/40 border border-green-100">
                 <div className="flex flex-col">
-                  <span className="text-[9px] font-black text-green-800 uppercase tracking-wider">Com MDFE</span>
-                  <span className="text-[9px] text-green-600 font-bold">{pctComMdfe.toFixed(0)}% cobertura</span>
+                  <span className="text-[10px] font-semibold text-green-800 uppercase tracking-tight">Com MDFE</span>
+                  <span className="text-[9px] font-medium text-green-600 mt-0.5">{((stats.comMdfe / Math.max(1, stats.comMdfe + stats.semMdfe)) * 100).toFixed(0)}% Cobertura</span>
                 </div>
-                <span className="font-black text-xl text-green-600">{stats.comMdfe}</span>
-             </button>
-             
-             <button 
-                onClick={(e) => { e.stopPropagation(); setActiveTab('manifestos'); setMdfeFilter('semMdfe'); }}
-                className="flex justify-between items-center p-3 rounded bg-red-50/50 border border-red-200 hover:bg-red-100 hover:border-red-300 transition-all text-left w-full group shadow-sm"
-             >
+                <span className="font-bold text-2xl text-green-600 leading-none">{stats.comMdfe}</span>
+             </div>
+             <div className="flex justify-between items-center p-4 rounded-lg bg-red-50/40 border border-red-100">
                 <div className="flex flex-col">
-                  <span className="text-[9px] font-black text-red-800 uppercase tracking-wider">SEM MDFE</span>
-                  <span className="text-[9px] text-red-600 font-bold">{pctSemMdfe.toFixed(0)}% pendente</span>
+                  <span className="text-[10px] font-semibold text-red-800 uppercase tracking-tight">Sem MDFE</span>
+                  <span className="text-[9px] font-medium text-red-600 mt-0.5">{((stats.semMdfe / Math.max(1, stats.comMdfe + stats.semMdfe)) * 100).toFixed(0)}% Pendente</span>
                 </div>
-                <span className="font-black text-xl text-red-600">{stats.semMdfe}</span>
-             </button>
+                <span className="font-bold text-2xl text-red-600 leading-none">{stats.semMdfe}</span>
+             </div>
            </div>
         </Card>
       </div>
 
-      <div className="bg-white rounded-lg shadow-lg overflow-hidden border border-gray-100 mt-6">
-        <div className="p-3 bg-gray-50 border-b flex flex-col sm:flex-row justify-between items-center gap-3">
-          <h3 className="font-bold text-[#0F103A] uppercase tracking-wide text-[9px] sm:text-[10px] text-center sm:text-left">
-            LISTAGEM: {activeTab === 'vendas' ? 'Vendas do Mês' : activeTab === 'baixas' ? 'Status de Entrega' : 'Controle de MDFE'}
-          </h3>
-          
-          <div className="flex flex-wrap justify-center gap-1 text-[8px] sm:text-[10px]">
-            {activeTab === 'baixas' ? (
-              <>
-                <button onClick={() => setBaixaFilter('all')} className={`px-2.5 py-1 rounded-full transition font-bold ${baixaFilter === 'all' ? 'bg-[#2E31B4] text-white shadow' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}>TODOS</button>
-                <button onClick={() => setBaixaFilter('noPrazo')} className={`px-2.5 py-1 rounded-full transition font-bold ${baixaFilter === 'noPrazo' ? 'bg-green-600 text-white shadow' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}>NO PRAZO</button>
-                <button onClick={() => setBaixaFilter('foraPrazo')} className={`px-2.5 py-1 rounded-full transition font-bold ${baixaFilter === 'foraPrazo' ? 'bg-red-600 text-white shadow' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}>ATRASADOS</button>
-                <button onClick={() => setBaixaFilter('semBaixa')} className={`px-2.5 py-1 rounded-full transition font-bold ${baixaFilter === 'semBaixa' ? 'bg-yellow-500 text-white shadow' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}>PENDENTES</button>
-              </>
-            ) : activeTab === 'manifestos' ? (
-              <>
-                <button onClick={() => setMdfeFilter('all')} className={`px-2.5 py-1 rounded-full transition font-bold ${mdfeFilter === 'all' ? 'bg-[#2E31B4] text-white shadow' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}>TODOS</button>
-                <button onClick={() => setMdfeFilter('comMdfe')} className={`px-2.5 py-1 rounded-full transition font-bold ${mdfeFilter === 'comMdfe' ? 'bg-green-600 text-white shadow' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}>COM MDFE</button>
-                <button onClick={() => setMdfeFilter('semMdfe')} className={`px-2.5 py-1 rounded-full transition font-bold ${mdfeFilter === 'semMdfe' ? 'bg-red-600 text-white shadow' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}>SEM MDFE</button>
-              </>
-            ) : null}
+      {/* List Table */}
+      <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100 mt-4">
+        <div className="px-4 py-4 bg-gray-50/50 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-center gap-3">
+          <h3 className="font-semibold text-[#0F103A] uppercase text-[10px] sm:text-xs tracking-wider">Listagem de Documentos</h3>
+          <div className="flex p-1 bg-gray-200/50 rounded-lg gap-1">
+            {['Vendas', 'Baixas', 'Manifestos'].map((t) => (
+              <button key={t} onClick={() => setActiveTab(t.toLowerCase() as TabType)} className={`px-4 py-1.5 rounded-md text-[9px] sm:text-xs font-semibold uppercase tracking-wider transition-all duration-200 ${activeTab === t.toLowerCase() ? 'bg-sle-primary text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 hover:bg-white/50'}`}>{t}</button>
+            ))}
           </div>
         </div>
-        
-        <div className="overflow-x-auto">
-          <table className="w-full text-[10px] sm:text-xs">
-            <thead className="bg-[#E8E8F9] text-[#24268B]">
+        <div className="w-full overflow-x-auto sm:overflow-x-visible">
+          <table className="w-full text-[10px] sm:text-sm text-left table-fixed">
+            <thead className="bg-[#F8F9FE] text-[#24268B]">
               <tr>
-                <th onClick={() => handleSort('data')} className="px-2 py-3 text-left font-bold cursor-pointer hover:bg-blue-100 transition whitespace-nowrap">
-                  <div className="flex items-center">DATA <ArrowUpDown className="w-2.5 h-2.5 ml-0.5 opacity-50"/></div>
+                <th className="w-[18%] px-3 py-4 font-semibold uppercase truncate cursor-pointer hover:bg-blue-100 transition-colors group" onClick={() => handleSort('data')}>
+                  <div className="flex items-center justify-start">DATA <SortIcon column="data" /></div>
                 </th>
-                <th onClick={() => handleSort('id')} className="px-2 py-3 text-left font-bold cursor-pointer hover:bg-blue-100 transition whitespace-nowrap">
-                  <div className="flex items-center">CTE <ArrowUpDown className="w-2.5 h-2.5 ml-0.5 opacity-50"/></div>
+                <th className="w-[18%] px-3 py-4 font-semibold uppercase truncate cursor-pointer hover:bg-blue-100 transition-colors group" onClick={() => handleSort('id')}>
+                  <div className="flex items-center justify-start">CTE <SortIcon column="id" /></div>
                 </th>
-                <th onClick={() => handleSort('valor')} className="px-2 py-3 text-right font-bold cursor-pointer hover:bg-blue-100 transition whitespace-nowrap">
-                  <div className="flex items-center justify-end">VALOR <ArrowUpDown className="w-2.5 h-2.5 ml-0.5 opacity-50"/></div>
+                <th className="w-[30%] px-3 py-4 text-right font-semibold uppercase truncate cursor-pointer hover:bg-blue-100 transition-colors group" onClick={() => handleSort('valor')}>
+                  <div className="flex items-center justify-end">VALOR <SortIcon column="valor" /></div>
                 </th>
-                <th onClick={() => handleSort('statusPrazo')} className="px-2 py-3 text-center font-bold cursor-pointer hover:bg-blue-100 transition whitespace-nowrap">
-                  <div className="flex items-center justify-center">STATUS <ArrowUpDown className="w-2.5 h-2.5 ml-0.5 opacity-50"/></div>
+                <th className="w-[17%] px-3 py-4 text-center font-semibold uppercase truncate cursor-pointer hover:bg-blue-100 transition-colors group" onClick={() => handleSort('statusPrazo')}>
+                  <div className="flex items-center justify-center">ENTR <SortIcon column="statusPrazo" /></div>
                 </th>
-                <th onClick={() => handleSort('statusMdfe')} className="px-2 py-3 text-center font-bold cursor-pointer hover:bg-blue-100 transition whitespace-nowrap">
-                  <div className="flex items-center justify-center">MDFE <ArrowUpDown className="w-2.5 h-2.5 ml-0.5 opacity-50"/></div>
+                <th className="w-[17%] px-3 py-4 text-center font-semibold uppercase truncate cursor-pointer hover:bg-blue-100 transition-colors group" onClick={() => handleSort('statusMdfe')}>
+                  <div className="flex items-center justify-center">MDFE <SortIcon column="statusMdfe" /></div>
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
-              {currentDocs.length > 0 ? (
-                currentDocs.map((doc, idx) => (
-                  <tr key={idx} className="hover:bg-blue-50 transition-colors group">
-                    <td className="px-2 py-2.5 whitespace-nowrap text-gray-600">{doc.data.toLocaleDateString('pt-BR')}</td>
-                    <td className="px-2 py-2.5 font-medium text-[#2E31B4] whitespace-nowrap">{doc.id}</td>
-                    <td className="px-2 py-2.5 text-right font-medium text-gray-700 whitespace-nowrap">{doc.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0 })}</td>
-                    <td className="px-2 py-2.5 text-center">
-                      <span className={`inline-block px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tight border whitespace-nowrap
-                        ${doc.statusPrazo?.toUpperCase() === 'NO PRAZO' ? 'bg-green-50 text-green-700 border-green-200' : 
-                          doc.statusPrazo?.toUpperCase() === 'FORA DO PRAZO' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-yellow-50 text-yellow-700 border-yellow-200'
-                        }`}>
-                        {doc.statusPrazo === 'NO PRAZO' ? 'OK' : doc.statusPrazo === 'FORA DO PRAZO' ? 'ATRASO' : 'PEND'}
-                      </span>
-                    </td>
-                    <td className="px-2 py-2.5 text-center">
-                      <span className={`inline-block px-1.5 py-0.5 rounded text-[8px] font-black border uppercase whitespace-nowrap
-                         ${(doc.statusMdfe?.toUpperCase().includes('ENCERRADO') || doc.statusMdfe?.toUpperCase().includes('AUTORIZADO') || doc.statusMdfe?.toUpperCase().includes('COM MDFE')) 
-                           ? 'bg-green-50 text-green-600 border-green-200' 
-                           : 'bg-red-50 text-red-600 border-red-200'}
-                      `}>
-                        {(doc.statusMdfe?.toUpperCase().includes('ENCERRADO') || doc.statusMdfe?.toUpperCase().includes('AUTORIZADO') || doc.statusMdfe?.toUpperCase().includes('COM MDFE')) ? 'SIM' : 'NÃO'}
-                      </span>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={5} className="px-4 py-12 text-center text-gray-400 italic">
-                    Nenhum documento encontrado neste filtro.
+            <tbody className="divide-y divide-gray-50">
+              {currentDocs.map((doc, idx) => (
+                <tr key={idx} className="hover:bg-blue-50/30 transition-colors group">
+                  <td className="px-3 py-4 text-gray-500 truncate font-medium">{doc.data.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'})}</td>
+                  <td className="px-3 py-4 text-sle-primary truncate font-semibold group-hover:text-blue-700">{doc.id}</td>
+                  <td className="px-3 py-4 text-right text-gray-700 truncate font-semibold">{doc.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</td>
+                  <td className="px-3 py-4 text-center">
+                    <span className={`inline-block px-2 py-0.5 rounded-md text-[9px] font-semibold border ${doc.statusPrazo?.includes('NO PRAZO') ? 'text-green-600 bg-green-50/50 border-green-100' : doc.statusPrazo?.includes('FORA') ? 'text-red-600 bg-red-50/50 border-red-100' : 'text-yellow-600 bg-yellow-50/50 border-yellow-100'}`}>
+                      {doc.statusPrazo?.includes('NO PRAZO') ? 'OK' : doc.statusPrazo?.includes('FORA') ? 'ATR' : 'PEN'}
+                    </span>
+                  </td>
+                  <td className="px-3 py-4 text-center">
+                    <span className={`inline-block px-2 py-0.5 rounded-md text-[9px] font-semibold border ${doc.statusMdfe?.match(/COM MDFE|ENCERRADO|AUTORIZADO/i) ? 'text-green-600 bg-green-50/50 border-green-100' : 'text-red-600 bg-red-50/50 border-red-100'}`}>
+                      {doc.statusMdfe?.match(/COM MDFE|ENCERRADO|AUTORIZADO/i) ? 'SIM' : 'NÃO'}
+                    </span>
                   </td>
                 </tr>
-              )}
+              ))}
             </tbody>
           </table>
         </div>

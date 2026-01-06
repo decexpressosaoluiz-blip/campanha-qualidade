@@ -67,6 +67,7 @@ const App: React.FC = () => {
         return {
           id: row[0],
           data: dateVal,
+          prazoBaixa: parseDate(row[5]), // Coluna F
           statusPrazo: row[6],
           unidadeColeta: normalizeUnitName(row[7]),
           unidadeEntrega: normalizeUnitName(row[8]),
@@ -141,11 +142,11 @@ const App: React.FC = () => {
     if (view === DashboardView.LOGIN) return <Login onLogin={handleLogin} loading={loading} error={loginError} />;
     if (view === DashboardView.MANAGER && data) {
       const stats = calculateStats(data, undefined, { start: dateRange.start ? new Date(dateRange.start) : null, end: dateRange.end ? new Date(dateRange.end) : null });
-      return <ManagerDashboard stats={stats} onSelectUnit={(u) => { setSelectedUnit(u); setView(DashboardView.UNIT_DETAIL); }} onDateFilterChange={(start, end) => setDateRange({ start, end })} dateRange={dateRange} lastUpdate={data.lastUpdate} fixedDays={data.fixedDays} />;
+      return <ManagerDashboard stats={stats} allCtes={data.ctes} onSelectUnit={(u) => { setSelectedUnit(u); setView(DashboardView.UNIT_DETAIL); }} onDateFilterChange={(start, end) => setDateRange({ start, end })} dateRange={dateRange} lastUpdate={data.lastUpdate} fixedDays={data.fixedDays} />;
     }
     if (view === DashboardView.UNIT_DETAIL && data && selectedUnit) {
       const stats = calculateStats(data, selectedUnit, { start: dateRange.start ? new Date(dateRange.start) : null, end: dateRange.end ? new Date(dateRange.end) : null });
-      return <UnitDashboard stats={stats[0]} user={user} onBack={() => setView(DashboardView.MANAGER)} setHeaderActions={setHeaderActions} lastUpdate={data.lastUpdate} />;
+      return <UnitDashboard stats={stats[0]} user={user} onBack={() => setView(DashboardView.MANAGER)} setHeaderActions={setHeaderActions} lastUpdate={data.lastUpdate} allCtes={data.ctes} />;
     }
     return null;
   };

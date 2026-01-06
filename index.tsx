@@ -4,8 +4,12 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 
 const rootElement = document.getElementById('root');
+
 if (!rootElement) {
-  throw new Error("Could not find root element to mount to");
+  const errorMsg = "Erro Crítico: Elemento raiz 'root' não encontrado no index.html. Verifique a estrutura do DOM.";
+  console.error(errorMsg);
+  document.body.innerHTML = `<div style="padding: 20px; color: red; font-family: sans-serif;">${errorMsg}</div>`;
+  throw new Error(errorMsg);
 }
 
 const root = ReactDOM.createRoot(rootElement);

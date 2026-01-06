@@ -70,6 +70,7 @@ export const calculateStats = (
     unitMap.set(m.unidade, {
       unidade: m.unidade,
       faturamento: 0,
+      vendasDiaAnterior: 0,
       recebido: 0,
       meta: m.meta,
       projecao: 0,
@@ -92,8 +93,15 @@ export const calculateStats = (
   const filterStart = dateRange?.start ? new Date(dateRange.start.getFullYear(), dateRange.start.getMonth(), dateRange.start.getDate(), 0,0,0) : null;
   const filterEnd = dateRange?.end ? new Date(dateRange.end.getFullYear(), dateRange.end.getMonth(), dateRange.end.getDate(), 23,59,59) : null;
 
+  // Para o cálculo do dia anterior, usamos a data da última atualização carregada
+  const lastUpdateStr = data.lastUpdate.toISOString().split('T')[0];
+
   // Process CTEs
   data.ctes.forEach(cte => {
+    // Cálculo do faturamento do dia da atualização (independente do filtro de período do dashboard)
+    const cteDateStr = cte.data.toISOString().split('T')[0];
+    const isLastDay = cteDateStr === lastUpdateStr;
+
     if (hasDateFilter && filterStart && filterEnd) {
       if (cte.data < filterStart || cte.data > filterEnd) return; 
     }
@@ -103,6 +111,10 @@ export const calculateStats = (
       const stats = unitMap.get(unitColeta)!;
       stats.faturamento += cte.valor;
       stats.docsVendas.push(cte);
+      
+      if (isLastDay) {
+        stats.vendasDiaAnterior += cte.valor;
+      }
 
       const statusMdfe = normalizeStatus(cte.statusMdfe);
       if (statusMdfe.includes('COM MDFE') || statusMdfe.includes('ENCERRADO') || statusMdfe.includes('AUTORIZADO')) {

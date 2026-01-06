@@ -7,6 +7,7 @@ export interface User {
 export interface Cte {
   id: string; // Chave/Número
   data: Date;
+  prazoBaixa: Date | null; // Coluna F
   unidadeColeta: string;
   unidadeEntrega: string;
   valor: number;
@@ -36,7 +37,8 @@ export interface AppData {
 export interface UnitStats {
   unidade: string;
   faturamento: number;
-  recebido: number; // Novo campo para total baseado na entrega (Coluna I)
+  vendasDiaAnterior: number; 
+  recebido: number; 
   meta: number;
   projecao: number;
   percentualProjecao: number;
