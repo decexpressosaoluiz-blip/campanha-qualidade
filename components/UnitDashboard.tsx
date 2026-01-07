@@ -14,13 +14,14 @@ interface UnitDashboardProps {
   setHeaderActions: (actions: React.ReactNode) => void;
   lastUpdate: Date;
   allCtes: Cte[];
+  fixedDays: { total: number; elapsed: number };
 }
 
 type TabType = 'vendas' | 'baixas' | 'manifestos';
 type SortKey = 'data' | 'id' | 'valor' | 'statusPrazo' | 'statusMdfe' | 'unidadeEntrega';
 type SortDirection = 'asc' | 'desc';
 
-const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderActions, lastUpdate, allCtes }) => {
+const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderActions, lastUpdate, allCtes, fixedDays }) => {
   const [activeTab, setActiveTab] = useState<TabType>('vendas');
   const [baixaFilter, setBaixaFilter] = useState<'all' | 'noPrazo' | 'foraPrazo' | 'semBaixa'>('all');
   const [mdfeFilter, setMdfeFilter] = useState<'all' | 'comMdfe' | 'semMdfe'>('all');
@@ -91,6 +92,10 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
     };
   }, [allCtes, deliveryFilter, stats.unidade]);
 
+  // Cálculo da Meta do Dia da Unidade
+  const remainingDays = Math.max(1, fixedDays.total - fixedDays.elapsed);
+  const metaDoDiaUnit = Math.max(0, stats.meta - stats.faturamento) / remainingDays;
+
   const handleSort = (key: SortKey) => setSortConfig(p => ({ key, direction: p.key === key && p.direction === 'asc' ? 'desc' : 'asc' }));
 
   const filterAndSortByDate = (tab: TabType, filterType: any) => {
@@ -139,9 +144,18 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
         {/* VENDAS CARD */}
         <Card title="VENDAS" icon={<DollarSign className="w-5 h-5 text-sle-primary opacity-60" />} className="border-l-sle-primary shadow-sm hover:shadow-md transition-shadow">
           <div className="space-y-4">
-             <div>
-               <span className="text-3xl font-bold text-[#0F103A] tracking-tight">{stats.faturamento.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</span>
-               <div className="text-[10px] font-semibold text-gray-400 mt-1 uppercase tracking-wider">Meta: {stats.meta.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</div>
+             <div className="flex justify-between items-start">
+               <div>
+                 <span className="text-3xl font-bold text-[#0F103A] tracking-tight">{stats.faturamento.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</span>
+                 <div className="text-[10px] font-semibold text-gray-400 mt-1 uppercase tracking-wider">Meta: {stats.meta.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</div>
+               </div>
+               {/* Área da Meta do Dia conforme sinalizado */}
+               <div className="bg-blue-50 border border-blue-100 rounded-lg p-2 text-right">
+                  <p className="text-[9px] font-bold text-blue-800 uppercase leading-none mb-1">Meta do Dia</p>
+                  <p className="text-sm font-bold text-sle-primary leading-none">
+                    {metaDoDiaUnit.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}
+                  </p>
+               </div>
              </div>
              
              <div className="bg-gray-50/50 p-3 rounded-lg border border-gray-100">
@@ -161,7 +175,7 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
              </div>
 
              <div className="space-y-2">
-                <div className="bg-blue-50/40 border border-blue-100/50 rounded-lg p-2.5 flex justify-between items-center cursor-pointer hover:bg-blue-100/50 transition-colors" onClick={() => { setActiveTab('vendas'); setSortConfig({ key: 'data', direction: 'asc' }); }}>
+                <div className="bg-blue-50/40 border border-blue-100/50 rounded-lg p-2.5 flex justify-between items-center cursor-pointer hover:bg-blue-100/50 transition-colors active:scale-[0.98]" onClick={() => { setActiveTab('vendas'); setSortConfig({ key: 'data', direction: 'asc' }); }}>
                     <span className="text-[10px] font-semibold text-blue-800 uppercase tracking-tight">Vendas dia {lastUpdate.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'})}</span>
                     <span className="text-sm font-bold text-[#2E31B4]">{stats.vendasDiaAnterior.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</span>
                 </div>
@@ -189,21 +203,22 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
                   className={`flex-1 flex flex-col items-center justify-center border rounded-lg transition-all cursor-pointer active:scale-95 ${baixaFilter === 'noPrazo' && activeTab === 'baixas' ? 'border-green-400 bg-green-100 ring-2 ring-green-100 shadow-inner' : 'border-green-100 bg-green-50/30 hover:bg-green-100/50 hover:shadow-sm'}`}
                 >
                   <span className="text-xl font-bold text-green-700 leading-none">{unitDeliveryStats.noPrazo}</span>
-                  <span className="text-[9px] font-semibold text-green-600 uppercase mt-1.5">{unitDeliveryStats.pctNoPrazo.toFixed(0)}% OK</span>
+                  <span className="text-[9px] font-semibold text-green-600 bg-green-100/50 px-2 py-0.5 rounded uppercase mt-1.5">{unitDeliveryStats.pctNoPrazo.toFixed(0)}% OK</span>
                 </div>
                 <div 
                   onClick={() => filterAndSortByDate('baixas', 'semBaixa')}
                   className={`flex-1 flex flex-col items-center justify-center border rounded-lg transition-all cursor-pointer shadow-sm active:scale-95 z-10 ${baixaFilter === 'semBaixa' && activeTab === 'baixas' ? 'border-yellow-400 bg-yellow-100 ring-2 ring-yellow-100 shadow-inner' : 'border-yellow-200 bg-yellow-50/50 hover:bg-yellow-100/50'}`}
                 >
+                  <AlertTriangle className="w-3.5 h-3.5 text-yellow-600 mb-1" />
                   <span className="text-2xl font-bold text-yellow-700 leading-none">{unitDeliveryStats.semBaixa}</span>
-                  <span className="text-[10px] font-bold text-yellow-600 uppercase mt-1.5 tracking-wide">{unitDeliveryStats.pctSemBaixa.toFixed(0)}% PEND</span>
+                  <span className="text-[10px] font-bold text-yellow-600 uppercase mt-1 tracking-wide">{unitDeliveryStats.pctSemBaixa.toFixed(0)}% PEND</span>
                 </div>
                 <div 
                   onClick={() => filterAndSortByDate('baixas', 'foraPrazo')}
                   className={`flex-1 flex flex-col items-center justify-center border rounded-lg transition-all cursor-pointer active:scale-95 ${baixaFilter === 'foraPrazo' && activeTab === 'baixas' ? 'border-red-400 bg-red-100 ring-2 ring-red-100 shadow-inner' : 'border-red-100 bg-red-50/30 hover:bg-red-100/50 hover:shadow-sm'}`}
                 >
                   <span className="text-xl font-bold text-red-700 leading-none">{unitDeliveryStats.foraPrazo}</span>
-                  <span className="text-[9px] font-semibold text-red-600 uppercase mt-1.5">{unitDeliveryStats.pctForaPrazo.toFixed(0)}% ATR</span>
+                  <span className="text-[9px] font-semibold text-red-600 bg-red-100/50 px-2 py-0.5 rounded uppercase mt-1.5">ATRASO</span>
                 </div>
               </div>
            </div>
@@ -220,7 +235,7 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
                   <span className="text-[10px] font-semibold text-green-800 uppercase tracking-tight leading-none">Com MDFE</span>
                   <span className="text-[9px] font-medium text-green-600 mt-1">{((stats.comMdfe / Math.max(1, stats.comMdfe + stats.semMdfe)) * 100).toFixed(0)}% Cobertura</span>
                 </div>
-                <span className="font-bold text-2xl text-green-600 leading-none">{stats.comMdfe}</span>
+                <span className="font-bold text-3xl text-green-600 leading-none">{stats.comMdfe}</span>
              </div>
              <div 
                onClick={() => filterAndSortByDate('manifestos', 'semMdfe')}
@@ -230,7 +245,7 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
                   <span className="text-[10px] font-semibold text-red-800 uppercase tracking-tight leading-none">Sem MDFE</span>
                   <span className="text-[9px] font-medium text-red-600 mt-1">{((stats.semMdfe / Math.max(1, stats.comMdfe + stats.semMdfe)) * 100).toFixed(0)}% Pendente</span>
                 </div>
-                <span className="font-bold text-2xl text-red-600 leading-none">{stats.semMdfe}</span>
+                <span className="font-bold text-3xl text-red-600 leading-none">{stats.semMdfe}</span>
              </div>
            </div>
         </Card>

@@ -3,7 +3,7 @@ import React, { useState, useMemo, useRef } from 'react';
 import { UnitStats, SortField, Cte } from '../types';
 import { Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ComposedChart } from 'recharts';
 import Card from './Card';
-import { DollarSign, Truck, FileText, Search, ArrowUpDown, Calendar, Filter, AlertTriangle, CheckCircle, XCircle, ChevronDown, Clock, Info, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { DollarSign, Truck, FileText, Search, ArrowUpDown, Calendar, Filter, AlertTriangle, CheckCircle, XCircle, ChevronDown, Clock, Info, Image as ImageIcon, Loader2, ArrowUp, ArrowDown } from 'lucide-react';
 import { toJpeg } from 'html-to-image';
 import { normalizeStatus } from '../services/calculationService';
 
@@ -75,12 +75,22 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, allCtes, onS
   const generalPercentProj = totalStats.meta > 0 ? (totalStats.projecao / totalStats.meta) * 100 : 0;
   const generalPercentFat = totalStats.meta > 0 ? (totalStats.faturamento / totalStats.meta) * 100 : 0;
 
+  // Cálculo da Meta do Dia Geral
+  const remainingDays = Math.max(1, fixedDays.total - fixedDays.elapsed);
+  const metaDoDiaGeral = Math.max(0, totalStats.meta - totalStats.faturamento) / remainingDays;
+
   const handleSort = (field: SortField) => {
     if (sortField === field) {
       setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
     } else {
       setSortField(field);
       setSortDirection(field === 'unidade' ? 'asc' : 'desc');
+    }
+    
+    // Smooth scroll to table when clicking a summary card to sort
+    const tableElement = document.getElementById('ranking-unidades');
+    if (tableElement) {
+      tableElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   };
 
@@ -97,6 +107,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, allCtes, onS
            valA = tA > 0 ? a.baixaNoPrazo / tA : 0;
            valB = tB > 0 ? b.baixaNoPrazo / tB : 0;
            break;
+        case 'foraPrazo': valA = a.baixaForaPrazo; valB = b.baixaForaPrazo; break;
         case 'semBaixa': valA = a.semBaixa; valB = b.semBaixa; break;
         case 'semMdfe':
           const tMdfeA = a.comMdfe + a.semMdfe;
@@ -129,6 +140,11 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, allCtes, onS
     } finally { 
       setIsExporting(false); 
     }
+  };
+
+  const SortIcon = ({ column }: { column: SortField }) => {
+    if (sortField !== column) return <ArrowUpDown className="w-2.5 h-2.5 ml-0.5 opacity-20" />;
+    return sortDirection === 'asc' ? <ArrowUp className="w-2.5 h-2.5 ml-0.5 text-sle-primary" /> : <ArrowDown className="w-2.5 h-2.5 ml-0.5 text-sle-primary" />;
   };
 
   return (
@@ -212,11 +228,19 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, allCtes, onS
         {/* FATURAMENTO CARD */}
         <Card title="FATURAMENTO GERAL" icon={<DollarSign className="w-5 h-5 text-sle-primary opacity-50"/>} className="border-l-sle-primary shadow-sm hover:shadow-md transition-shadow">
            <div className="space-y-4">
-             <div>
-               <div className="text-3xl font-bold text-[#0F103A] tracking-tight leading-none">
-                 {totalStats.faturamento.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}
+             <div className="flex justify-between items-start">
+               <div>
+                 <div className="text-3xl font-bold text-[#0F103A] tracking-tight leading-none">
+                   {totalStats.faturamento.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}
+                 </div>
+                 <div className="text-[10px] text-gray-400 mt-2 font-semibold uppercase tracking-wider">Meta Total: {totalStats.meta.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</div>
                </div>
-               <div className="text-[10px] text-gray-400 mt-2 font-semibold uppercase tracking-wider">Meta Total: {totalStats.meta.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</div>
+               <div className="bg-blue-50 border border-blue-100 rounded-lg p-2 text-right">
+                  <p className="text-[9px] font-bold text-blue-800 uppercase leading-none mb-1">Meta do Dia</p>
+                  <p className="text-sm font-bold text-sle-primary leading-none">
+                    {metaDoDiaGeral.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}
+                  </p>
+               </div>
              </div>
              <div className="bg-gray-50/50 p-3 rounded-lg border border-gray-100">
                 <div className="flex justify-between items-end mb-2">
@@ -253,16 +277,25 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, allCtes, onS
                 </div>
              </div>
              <div className="grid grid-cols-3 gap-2 items-center text-center h-[90px]">
-               <div className="flex flex-col border-r border-gray-100 px-1 py-1">
+               <div 
+                onClick={() => handleSort('noPrazo')}
+                className="flex flex-col border-r border-gray-100 px-1 py-1 cursor-pointer hover:bg-green-50/50 rounded-l-lg transition-colors active:scale-95"
+               >
                   <span className="text-xl font-bold text-green-700 leading-none">{deliveryStats.noPrazo}</span>
                   <span className="text-[10px] font-semibold text-green-600 bg-green-50/50 rounded-md mt-2 py-0.5">{deliveryStats.pctNoPrazo.toFixed(0)}% OK</span>
                </div>
-               <div className="flex flex-col bg-yellow-50/50 rounded-lg px-2 py-3 border border-yellow-100 shadow-sm transform scale-105 transition-transform hover:scale-110">
+               <div 
+                onClick={() => handleSort('semBaixa')}
+                className="flex flex-col bg-yellow-50/50 rounded-lg px-2 py-3 border border-yellow-100 shadow-sm cursor-pointer transform scale-105 transition-all hover:scale-110 active:scale-100"
+               >
                   <AlertTriangle className="w-4 h-4 text-yellow-600 mx-auto mb-1" />
                   <span className="text-2xl font-bold text-yellow-700 leading-none">{deliveryStats.semBaixa}</span>
                   <span className="text-[10px] font-bold text-yellow-600 mt-1 uppercase tracking-tighter">{deliveryStats.pctSemBaixa.toFixed(0)}% PEND</span>
                </div>
-               <div className="flex flex-col border-l border-gray-100 px-1 py-1">
+               <div 
+                onClick={() => handleSort('foraPrazo')}
+                className="flex flex-col border-l border-gray-100 px-1 py-1 cursor-pointer hover:bg-red-50/50 rounded-r-lg transition-colors active:scale-95"
+               >
                   <span className="text-xl font-bold text-red-700 leading-none">{deliveryStats.foraPrazo}</span>
                   <span className="text-[10px] font-semibold text-red-600 bg-red-50/50 rounded-md mt-2 py-0.5">ATRASO</span>
                </div>
@@ -273,14 +306,20 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, allCtes, onS
         {/* MANIFESTOS CARD */}
         <Card title="MANIFESTOS" icon={<FileText className="w-5 h-5 text-danger opacity-50"/>} className="border-l-danger shadow-sm hover:shadow-md transition-shadow">
            <div className="flex flex-col gap-3 py-1 justify-center min-h-[140px]">
-              <div className="flex justify-between items-center p-4 rounded-lg bg-green-50/40 border border-green-100">
+              <div 
+                onClick={() => handleSort('faturamento')} // Poderia ser cobertura mas usamos vendas como prox
+                className="flex justify-between items-center p-4 rounded-lg bg-green-50/40 border border-green-100 cursor-pointer hover:bg-green-100/50 transition-colors active:scale-95"
+              >
                 <div className="flex flex-col">
                   <span className="text-[10px] font-semibold text-green-800 uppercase tracking-tight leading-none">Com MDFE</span>
                   <span className="text-[9px] font-medium text-green-600 mt-1">{((totalStats.comMdfe / Math.max(1, totalStats.comMdfe + totalStats.semMdfe)) * 100).toFixed(0)}% Cobertura</span>
                 </div>
                 <span className="font-bold text-2xl text-green-600 leading-none">{totalStats.comMdfe}</span>
               </div>
-              <div className="flex justify-between items-center p-4 rounded-lg bg-red-50/40 border border-red-100">
+              <div 
+                onClick={() => handleSort('semMdfe')}
+                className="flex justify-between items-center p-4 rounded-lg bg-red-50/40 border border-red-100 cursor-pointer hover:bg-red-100/50 transition-colors active:scale-95"
+              >
                 <div className="flex flex-col">
                   <span className="text-[10px] font-semibold text-red-800 uppercase tracking-tight leading-none">Sem MDFE</span>
                   <span className="text-[9px] font-medium text-red-600 mt-1">{((totalStats.semMdfe / Math.max(1, totalStats.comMdfe + totalStats.semMdfe)) * 100).toFixed(0)}% Pendente</span>
@@ -292,7 +331,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, allCtes, onS
       </div>
 
       {/* Ranking Table */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100 mt-6">
+      <div id="ranking-unidades" className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100 mt-6">
         <div className="p-4 border-b border-gray-50 bg-gray-50/30 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-2">
              <Filter className="text-sle-primary w-4 h-4"/>
@@ -308,8 +347,13 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, allCtes, onS
                   <ArrowUpDown className="w-4 h-4 text-gray-400" /><span>Ordenar</span><ChevronDown className="w-3.5 h-3.5 text-gray-400" />
                 </button>
                 <div className="absolute top-full right-0 mt-1 w-full min-w-[180px] bg-white border border-gray-100 rounded-xl shadow-xl hidden group-hover:block z-20 overflow-hidden py-1">
-                      {['faturamento', 'projecao', 'noPrazo', 'semMdfe'].map(f => (
-                        <button key={f} onClick={() => { setSortField(f as SortField); setSortDirection('desc'); }} className={`block w-full text-left px-4 py-2.5 text-[10px] font-semibold hover:bg-blue-50 text-gray-600 uppercase tracking-wider transition-colors ${sortField === f ? 'bg-blue-50 text-sle-primary' : ''}`}>{f === 'faturamento' ? 'Faturamento' : f === 'projecao' ? '% Projeção' : f === 'noPrazo' ? '% Entrega' : 'Sem MDFE'}</button>
+                      {[
+                        { label: 'Faturamento', key: 'faturamento' },
+                        { label: '% Projeção', key: 'projecao' },
+                        { label: '% Entrega', key: 'noPrazo' },
+                        { label: 'Sem MDFE', key: 'semMdfe' }
+                      ].map(f => (
+                        <button key={f.key} onClick={() => { setSortField(f.key as SortField); setSortDirection('desc'); }} className={`block w-full text-left px-4 py-2.5 text-[10px] font-semibold hover:bg-blue-50 text-gray-600 uppercase tracking-wider transition-colors ${sortField === f.key ? 'bg-blue-50 text-sle-primary' : ''}`}>{f.label}</button>
                       ))}
                 </div>
              </div>
@@ -317,14 +361,24 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, allCtes, onS
         </div>
 
         <div className="w-full overflow-x-auto">
-          <table className="w-full text-[10px] sm:text-sm text-left table-fixed">
+          <table className="w-full text-[10px] sm:text-sm text-left table-fixed min-w-[500px]">
             <thead className="bg-[#F8F9FE] text-[#24268B]">
                <tr>
-                 <th className="w-[35%] px-3 py-4 font-semibold uppercase truncate tracking-tight cursor-pointer" onClick={() => handleSort('unidade')}>Unidade</th>
-                 <th className="w-[22%] px-2 py-4 text-right font-semibold uppercase truncate tracking-tight cursor-pointer" onClick={() => handleSort('faturamento')}>Vendas</th>
-                 <th className="w-[20%] px-2 py-4 text-right font-semibold uppercase truncate tracking-tight cursor-pointer" onClick={() => handleSort('projecao')}>Proj</th>
-                 <th className="w-[11%] px-1 py-4 text-center font-semibold uppercase truncate tracking-tight">%</th>
-                 <th className="w-[12%] px-1 py-4 text-center font-semibold uppercase truncate tracking-tight cursor-pointer" onClick={() => handleSort('noPrazo')}>OK</th>
+                 <th className="w-[35%] px-3 py-4 font-bold uppercase truncate tracking-tight cursor-pointer hover:bg-blue-100 transition-colors group" onClick={() => handleSort('unidade')}>
+                    <div className="flex items-center">UNIDADE <SortIcon column="unidade" /></div>
+                 </th>
+                 <th className="w-[22%] px-2 py-4 text-right font-bold uppercase truncate tracking-tight cursor-pointer hover:bg-blue-100 transition-colors group" onClick={() => handleSort('faturamento')}>
+                    <div className="flex items-center justify-end">VENDAS <SortIcon column="faturamento" /></div>
+                 </th>
+                 <th className="w-[20%] px-2 py-4 text-right font-bold uppercase truncate tracking-tight cursor-pointer hover:bg-blue-100 transition-colors group" onClick={() => handleSort('projecao')}>
+                    <div className="flex items-center justify-end">PROJ <SortIcon column="projecao" /></div>
+                 </th>
+                 <th className="w-[11%] px-1 py-4 text-center font-bold uppercase truncate tracking-tight cursor-pointer hover:bg-blue-100 transition-colors group" onClick={() => handleSort('projecao')}>
+                    <div className="flex items-center justify-center">% <SortIcon column="projecao" /></div>
+                 </th>
+                 <th className="w-[12%] px-1 py-4 text-center font-bold uppercase truncate tracking-tight cursor-pointer hover:bg-blue-100 transition-colors group" onClick={() => handleSort('noPrazo')}>
+                    <div className="flex items-center justify-center">OK <SortIcon column="noPrazo" /></div>
+                 </th>
                </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
