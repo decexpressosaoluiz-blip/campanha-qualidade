@@ -113,20 +113,77 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, allCtes, onS
     if (!exportContainerRef.current) return;
     setIsExporting(true);
     try {
-      await new Promise(r => setTimeout(r, 400));
-      const dataUrl = await toJpeg(exportContainerRef.current, { quality: 0.95, backgroundColor: '#ffffff', pixelRatio: 2 });
+      // Pequeno delay para garantir que o DOM oculto esteja pronto
+      await new Promise(r => setTimeout(r, 500));
+      const dataUrl = await toJpeg(exportContainerRef.current, { 
+        quality: 0.95, 
+        backgroundColor: '#ffffff', 
+        pixelRatio: 2 
+      });
       const link = document.createElement('a');
       link.download = `Ranking_SLE_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.jpeg`;
-      link.href = dataUrl; link.click();
-    } catch (err) { alert('Erro ao gerar imagem.'); } 
-    finally { setIsExporting(false); }
+      link.href = dataUrl; 
+      link.click();
+    } catch (err) { 
+      console.error(err);
+      alert('Erro ao gerar imagem.'); 
+    } finally { 
+      setIsExporting(false); 
+    }
   };
 
   return (
     <div className="space-y-6 animate-fade-in pb-10 px-1 sm:px-0">
       
-      {/* Export View (Hidden) */}
-      <div style={{ position: 'absolute', left: '-9999px' }}><div ref={exportContainerRef} style={{ padding: '40px', background: '#fff', width: '850px' }}></div></div>
+      {/* Container Oculto para Exportação - Populado para evitar arquivos brancos */}
+      <div style={{ position: 'absolute', left: '-9999px', top: '0' }}>
+        <div ref={exportContainerRef} className="bg-white p-10 w-[1100px] font-sans">
+           <div className="flex justify-between items-end mb-8 border-b-2 border-sle-primary pb-6">
+              <div>
+                 <h1 className="text-4xl font-bold text-sle-dark mb-1">SÃO LUIZ EXPRESS</h1>
+                 <p className="text-sm font-semibold text-gray-400 uppercase tracking-widest">Painel Operacional • {new Date().toLocaleDateString('pt-BR')}</p>
+              </div>
+              <div className="text-right">
+                 <p className="text-xs font-bold text-sle-primary uppercase tracking-wider mb-1">Faturamento Geral</p>
+                 <p className="text-3xl font-bold text-sle-dark">{totalStats.faturamento.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</p>
+              </div>
+           </div>
+           
+           <table className="w-full text-base text-left border-collapse">
+              <thead className="bg-[#F8F9FE] text-[#24268B]">
+                 <tr>
+                   <th className="px-4 py-5 font-bold uppercase border-b-2 border-gray-100">Unidade</th>
+                   <th className="px-4 py-5 text-right font-bold uppercase border-b-2 border-gray-100">Vendas</th>
+                   <th className="px-4 py-5 text-right font-bold uppercase border-b-2 border-gray-100">Projeção</th>
+                   <th className="px-4 py-5 text-center font-bold uppercase border-b-2 border-gray-100">% Proj</th>
+                   <th className="px-4 py-5 text-center font-bold uppercase border-b-2 border-gray-100">Entrega</th>
+                 </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                 {sortedStats.map((stat) => {
+                   const tB = stat.baixaNoPrazo + stat.baixaForaPrazo + stat.semBaixa;
+                   const pN = tB > 0 ? (stat.baixaNoPrazo / tB) * 100 : 0;
+                   return (
+                     <tr key={stat.unidade} className="bg-white">
+                       <td className="px-4 py-6 font-bold text-sle-dark uppercase border-b border-gray-50">{stat.unidade}</td>
+                       <td className="px-4 py-6 text-right text-gray-600 font-semibold border-b border-gray-50">{stat.faturamento.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</td>
+                       <td className="px-4 py-6 text-right text-sle-primary font-bold border-b border-gray-50">{stat.projecao.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</td>
+                       <td className="px-4 py-6 text-center border-b border-gray-50">
+                         <span className={`px-3 py-1.5 rounded-md text-xs font-bold ${stat.percentualProjecao >= 100 ? 'text-green-700 bg-green-50' : 'text-red-700 bg-red-50'}`}>{stat.percentualProjecao.toFixed(0)}%</span>
+                       </td>
+                       <td className="px-4 py-6 text-center border-b border-gray-50">
+                          <span className={`text-xs font-bold px-3 py-1.5 rounded-md ${pN >= 90 ? 'text-green-700 bg-green-50' : 'text-red-700 bg-red-50'}`}>{pN.toFixed(0)}%</span>
+                       </td>
+                     </tr>
+                   );
+                 })}
+              </tbody>
+           </table>
+           <div className="mt-12 pt-6 border-t border-gray-100 text-center">
+              <p className="text-[10px] text-gray-300 font-bold uppercase tracking-[0.6em]">Documento gerado automaticamente pelo Sistema SLE</p>
+           </div>
+        </div>
+      </div>
 
       {/* Toolbar */}
       <div className="bg-white px-4 py-3 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4">
@@ -241,7 +298,8 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, allCtes, onS
           </div>
           <div className="flex items-center gap-2 w-full sm:w-auto">
              <button disabled={isExporting} onClick={handleDownloadImage} className="flex-1 sm:flex-none flex items-center justify-center bg-[#059669] text-white px-4 py-2.5 rounded-lg shadow-sm text-[10px] sm:text-xs font-semibold uppercase tracking-widest hover:bg-[#047857] active:scale-95 transition-all">
-                <ImageIcon className="w-4 h-4 mr-2" /> Baixar Imagem
+                {isExporting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ImageIcon className="w-4 h-4 mr-2" />}
+                {isExporting ? 'Gerando...' : 'Baixar Imagem'}
              </button>
              <div className="relative group flex-1 sm:flex-none">
                 <button className="w-full flex items-center justify-center space-x-2 text-[10px] sm:text-xs text-gray-700 bg-white border border-gray-200 py-2.5 px-4 rounded-lg shadow-sm hover:bg-gray-50 font-semibold uppercase tracking-tight">
@@ -260,11 +318,11 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, allCtes, onS
           <table className="w-full text-[10px] sm:text-sm text-left table-fixed">
             <thead className="bg-[#F8F9FE] text-[#24268B]">
                <tr>
-                 <th className="w-[35%] px-3 py-4 font-semibold uppercase truncate tracking-tight" onClick={() => handleSort('unidade')}>Unidade</th>
-                 <th className="w-[22%] px-2 py-4 text-right font-semibold uppercase truncate tracking-tight" onClick={() => handleSort('faturamento')}>Vendas</th>
-                 <th className="w-[20%] px-2 py-4 text-right font-semibold uppercase truncate tracking-tight" onClick={() => handleSort('projecao')}>Proj</th>
-                 <th className="w-[11%] px-1 py-4 text-center font-semibold uppercase truncate tracking-tight" onClick={() => handleSort('projecao')}>%</th>
-                 <th className="w-[12%] px-1 py-4 text-center font-semibold uppercase truncate tracking-tight" onClick={() => handleSort('noPrazo')}>OK</th>
+                 <th className="w-[35%] px-3 py-4 font-semibold uppercase truncate tracking-tight cursor-pointer" onClick={() => handleSort('unidade')}>Unidade</th>
+                 <th className="w-[22%] px-2 py-4 text-right font-semibold uppercase truncate tracking-tight cursor-pointer" onClick={() => handleSort('faturamento')}>Vendas</th>
+                 <th className="w-[20%] px-2 py-4 text-right font-semibold uppercase truncate tracking-tight cursor-pointer" onClick={() => handleSort('projecao')}>Proj</th>
+                 <th className="w-[11%] px-1 py-4 text-center font-semibold uppercase truncate tracking-tight">%</th>
+                 <th className="w-[12%] px-1 py-4 text-center font-semibold uppercase truncate tracking-tight cursor-pointer" onClick={() => handleSort('noPrazo')}>OK</th>
                </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -295,5 +353,10 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, allCtes, onS
     </div>
   );
 };
+
+// Helper loader component if missing elsewhere
+const Loader2 = ({ className }: { className?: string }) => (
+  <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+);
 
 export default ManagerDashboard;
