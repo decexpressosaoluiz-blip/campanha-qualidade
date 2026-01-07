@@ -153,6 +153,9 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
                    <span className={`text-lg font-bold ${stats.percentualProjecao >= 100 ? 'text-green-600' : 'text-red-600'}`}>{stats.percentualProjecao.toFixed(1)}%</span>
                 </div>
                 <div className="relative w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                    {/* Barra de Projeção (Transparente) */}
+                    <div className={`absolute top-0 left-0 h-full transition-all duration-500 opacity-40 ${stats.percentualProjecao >= 100 ? 'bg-green-600' : 'bg-red-600'}`} style={{ width: `${Math.min(stats.percentualProjecao, 100)}%` }}></div>
+                    {/* Barra de Faturamento Atual (Sólida) */}
                     <div className={`absolute top-0 left-0 h-full transition-all duration-500 ${stats.percentualProjecao >= 100 ? 'bg-green-600' : 'bg-red-600'}`} style={{ width: `${Math.min((stats.faturamento / stats.meta) * 100, 100)}%` }}></div>
                 </div>
              </div>

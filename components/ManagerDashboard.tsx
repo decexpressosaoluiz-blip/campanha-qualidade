@@ -3,7 +3,7 @@ import React, { useState, useMemo, useRef } from 'react';
 import { UnitStats, SortField, Cte } from '../types';
 import { Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ComposedChart } from 'recharts';
 import Card from './Card';
-import { DollarSign, Truck, FileText, Search, ArrowUpDown, Calendar, Filter, AlertTriangle, CheckCircle, XCircle, ChevronDown, Clock, Info, Image as ImageIcon } from 'lucide-react';
+import { DollarSign, Truck, FileText, Search, ArrowUpDown, Calendar, Filter, AlertTriangle, CheckCircle, XCircle, ChevronDown, Clock, Info, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { toJpeg } from 'html-to-image';
 import { normalizeStatus } from '../services/calculationService';
 
@@ -113,7 +113,6 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, allCtes, onS
     if (!exportContainerRef.current) return;
     setIsExporting(true);
     try {
-      // Pequeno delay para garantir que o DOM oculto esteja pronto
       await new Promise(r => setTimeout(r, 500));
       const dataUrl = await toJpeg(exportContainerRef.current, { 
         quality: 0.95, 
@@ -135,7 +134,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, allCtes, onS
   return (
     <div className="space-y-6 animate-fade-in pb-10 px-1 sm:px-0">
       
-      {/* Container Oculto para Exportação - Populado para evitar arquivos brancos */}
+      {/* Container Oculto para Exportação */}
       <div style={{ position: 'absolute', left: '-9999px', top: '0' }}>
         <div ref={exportContainerRef} className="bg-white p-10 w-[1100px] font-sans">
            <div className="flex justify-between items-end mb-8 border-b-2 border-sle-primary pb-6">
@@ -227,8 +226,11 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, allCtes, onS
                    </div>
                    <span className={`text-xl font-bold ${generalPercentProj >= 100 ? 'text-green-600' : 'text-red-600'}`}>{generalPercentProj.toFixed(1)}%</span>
                 </div>
-                <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                    <div className={`h-full transition-all duration-500 ${generalPercentProj >= 100 ? 'bg-green-600' : 'bg-red-600'}`} style={{ width: `${Math.min(generalPercentFat, 100)}%` }}></div>
+                <div className="relative w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                    {/* Barra de Projeção (Ghost) */}
+                    <div className={`absolute top-0 left-0 h-full transition-all duration-500 opacity-40 ${generalPercentProj >= 100 ? 'bg-green-600' : 'bg-red-600'}`} style={{ width: `${Math.min(generalPercentProj, 100)}%` }}></div>
+                    {/* Barra Atual (Sólida) */}
+                    <div className={`absolute top-0 left-0 h-full transition-all duration-500 ${generalPercentProj >= 100 ? 'bg-green-600' : 'bg-red-600'}`} style={{ width: `${Math.min(generalPercentFat, 100)}%` }}></div>
                 </div>
              </div>
              <div className="bg-blue-50/40 border border-blue-100/50 rounded-lg p-3 flex justify-between items-center">
@@ -353,10 +355,5 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, allCtes, onS
     </div>
   );
 };
-
-// Helper loader component if missing elsewhere
-const Loader2 = ({ className }: { className?: string }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
-);
 
 export default ManagerDashboard;
