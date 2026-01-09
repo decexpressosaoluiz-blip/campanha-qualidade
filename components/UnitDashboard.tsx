@@ -6,6 +6,7 @@ import { DollarSign, Truck, FileText, CheckCircle, AlertTriangle, XCircle, Downl
 import { downloadXLS } from '../services/excelService';
 import { LINKS } from '../constants';
 import { normalizeStatus } from '../services/calculationService';
+import DailyRevenueChart from './DailyRevenueChart';
 
 interface UnitDashboardProps {
   stats: UnitStats;
@@ -250,6 +251,9 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
            </div>
         </Card>
       </div>
+
+      {/* Chart Section - Specific for Unit */}
+      <DailyRevenueChart ctes={allCtes} unitName={stats.unidade} />
 
       {/* List Table Section */}
       <div id="listagem-documentos" className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100 mt-4 mx-2 sm:mx-0">

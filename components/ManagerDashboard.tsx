@@ -1,11 +1,11 @@
 
 import React, { useState, useMemo, useRef } from 'react';
-import { UnitStats, SortField, Cte } from '../types';
-import { Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ComposedChart } from 'recharts';
+import { UnitStats, Cte } from '../types';
 import Card from './Card';
-import { DollarSign, Truck, FileText, Search, ArrowUpDown, Calendar, Filter, AlertTriangle, CheckCircle, XCircle, ChevronDown, Clock, Info, Image as ImageIcon, Loader2, ArrowUp, ArrowDown } from 'lucide-react';
+import { DollarSign, Truck, FileText, Search, ArrowUpDown, Calendar, Filter, AlertTriangle, Image as ImageIcon, Loader2, ArrowUp, ArrowDown, Clock } from 'lucide-react';
 import { toJpeg } from 'html-to-image';
 import { normalizeStatus } from '../services/calculationService';
+import DailyRevenueChart from './DailyRevenueChart';
 
 interface ManagerDashboardProps {
   stats: UnitStats[];
@@ -17,15 +17,32 @@ interface ManagerDashboardProps {
   fixedDays: { total: number; elapsed: number };
 }
 
+type SortDirection = 'asc' | 'desc';
+
+// Tipos de ordenação específicos para cada tabela
+type SalesSortField = 'unidade' | 'faturamento' | 'projecao' | 'percentualProjecao';
+type DeliverySortField = 'unidade' | 'totalRecebimentos' | 'pctNoPrazo' | 'pctSemBaixa' | 'pctForaPrazo';
+type ManifestSortField = 'unidade' | 'totalEmissoes' | 'pctComMdfe' | 'pctSemMdfe';
+
 const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, allCtes, onSelectUnit, onDateFilterChange, dateRange, lastUpdate, fixedDays }) => {
   const [filter, setFilter] = useState('');
-  const [sortField, setSortField] = useState<SortField>('faturamento'); 
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
-  const exportContainerRef = useRef<HTMLDivElement>(null);
-  const [isExporting, setIsExporting] = useState(false);
+  
+  // States de Ordenação Independentes
+  const [salesSort, setSalesSort] = useState<{field: SalesSortField, dir: SortDirection}>({ field: 'faturamento', dir: 'desc' });
+  const [deliverySort, setDeliverySort] = useState<{field: DeliverySortField, dir: SortDirection}>({ field: 'pctNoPrazo', dir: 'desc' });
+  const [manifestSort, setManifestSort] = useState<{field: ManifestSortField, dir: SortDirection}>({ field: 'pctComMdfe', dir: 'desc' });
+
+  // Refs para exportação
+  const exportSalesRef = useRef<HTMLDivElement>(null);
+  const exportDeliveryRef = useRef<HTMLDivElement>(null);
+  const exportManifestRef = useRef<HTMLDivElement>(null);
+  
+  const [isExporting, setIsExporting] = useState<string | null>(null); // 'sales' | 'delivery' | 'manifest' | null
   
   const defaultDeliveryEnd = lastUpdate.toISOString().split('T')[0];
   const [deliveryFilter, setDeliveryFilter] = useState({ start: '', end: defaultDeliveryEnd });
+
+  // --- PREPARAÇÃO DE DADOS ---
 
   const filteredStats = useMemo(() => {
     return stats.filter(s => s.unidade.includes(filter.toUpperCase()));
@@ -69,136 +86,204 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, allCtes, onS
       semBaixa: countSemBaixa,
       pctNoPrazo: total > 0 ? (countNoPrazo / total) * 100 : 0,
       pctSemBaixa: total > 0 ? (countSemBaixa / total) * 100 : 0,
+      pctForaPrazo: total > 0 ? (countForaPrazo / total) * 100 : 0,
     };
   }, [allCtes, deliveryFilter]);
 
   const generalPercentProj = totalStats.meta > 0 ? (totalStats.projecao / totalStats.meta) * 100 : 0;
   const generalPercentFat = totalStats.meta > 0 ? (totalStats.faturamento / totalStats.meta) * 100 : 0;
-
-  // Cálculo da Meta do Dia Geral
   const remainingDays = Math.max(1, fixedDays.total - fixedDays.elapsed);
   const metaDoDiaGeral = Math.max(0, totalStats.meta - totalStats.faturamento) / remainingDays;
 
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortDirection(field === 'unidade' ? 'asc' : 'desc');
-    }
-    
-    // Smooth scroll to table when clicking a summary card to sort
-    const tableElement = document.getElementById('ranking-unidades');
-    if (tableElement) {
-      tableElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+  // --- HANDLERS DE ORDENAÇÃO ---
+
+  const handleSalesSort = (field: SalesSortField) => {
+    setSalesSort(prev => ({ field, dir: prev.field === field && prev.dir === 'desc' ? 'asc' : 'desc' }));
   };
 
-  const sortedStats = useMemo(() => {
+  const handleDeliverySort = (field: DeliverySortField) => {
+    setDeliverySort(prev => ({ field, dir: prev.field === field && prev.dir === 'desc' ? 'asc' : 'desc' }));
+  };
+
+  const handleManifestSort = (field: ManifestSortField) => {
+    setManifestSort(prev => ({ field, dir: prev.field === field && prev.dir === 'desc' ? 'asc' : 'desc' }));
+  };
+
+  // --- PREPARAÇÃO DAS LISTAS ORDENADAS ---
+
+  const sortedSalesStats = useMemo(() => {
     return [...filteredStats].sort((a, b) => {
       let valA = 0, valB = 0;
-      switch (sortField) {
-        case 'unidade': return sortDirection === 'asc' ? a.unidade.localeCompare(b.unidade) : b.unidade.localeCompare(a.unidade);
-        case 'faturamento': valA = a.faturamento; valB = b.faturamento; break;
-        case 'projecao': valA = a.percentualProjecao; valB = b.percentualProjecao; break;
-        case 'noPrazo':
-           const tA = a.baixaNoPrazo + a.baixaForaPrazo + a.semBaixa;
-           const tB = b.baixaNoPrazo + b.baixaForaPrazo + b.semBaixa;
-           valA = tA > 0 ? a.baixaNoPrazo / tA : 0;
-           valB = tB > 0 ? b.baixaNoPrazo / tB : 0;
-           break;
-        case 'foraPrazo': valA = a.baixaForaPrazo; valB = b.baixaForaPrazo; break;
-        case 'semBaixa': valA = a.semBaixa; valB = b.semBaixa; break;
-        case 'semMdfe':
-          const tMdfeA = a.comMdfe + a.semMdfe;
-          const tMdfeB = b.comMdfe + b.semMdfe;
-          valA = tMdfeA > 0 ? a.semMdfe / tMdfeA : 0;
-          valB = tMdfeB > 0 ? b.semMdfe / tMdfeB : 0;
-          break;
-      }
-      return sortDirection === 'asc' ? valA - valB : valB - valA;
+      if (salesSort.field === 'unidade') return salesSort.dir === 'asc' ? a.unidade.localeCompare(b.unidade) : b.unidade.localeCompare(a.unidade);
+      if (salesSort.field === 'faturamento') { valA = a.faturamento; valB = b.faturamento; }
+      if (salesSort.field === 'projecao') { valA = a.projecao; valB = b.projecao; }
+      if (salesSort.field === 'percentualProjecao') { valA = a.percentualProjecao; valB = b.percentualProjecao; }
+      return salesSort.dir === 'asc' ? valA - valB : valB - valA;
     });
-  }, [filteredStats, sortField, sortDirection]);
+  }, [filteredStats, salesSort]);
 
-  const handleDownloadImage = async () => {
-    if (!exportContainerRef.current) return;
-    setIsExporting(true);
+  const sortedDeliveryStats = useMemo(() => {
+    return [...filteredStats].map(s => {
+        const total = s.baixaNoPrazo + s.baixaForaPrazo + s.semBaixa;
+        return {
+            ...s,
+            totalRecebimentos: total,
+            pctNoPrazo: total > 0 ? (s.baixaNoPrazo / total) * 100 : 0,
+            pctSemBaixa: total > 0 ? (s.semBaixa / total) * 100 : 0,
+            pctForaPrazo: total > 0 ? (s.baixaForaPrazo / total) * 100 : 0,
+        }
+    }).sort((a, b) => {
+        let valA = 0, valB = 0;
+        if (deliverySort.field === 'unidade') return deliverySort.dir === 'asc' ? a.unidade.localeCompare(b.unidade) : b.unidade.localeCompare(a.unidade);
+        if (deliverySort.field === 'totalRecebimentos') { valA = a.totalRecebimentos; valB = b.totalRecebimentos; }
+        if (deliverySort.field === 'pctNoPrazo') { valA = a.pctNoPrazo; valB = b.pctNoPrazo; }
+        if (deliverySort.field === 'pctSemBaixa') { valA = a.pctSemBaixa; valB = b.pctSemBaixa; }
+        if (deliverySort.field === 'pctForaPrazo') { valA = a.pctForaPrazo; valB = b.pctForaPrazo; }
+        return deliverySort.dir === 'asc' ? valA - valB : valB - valA;
+    });
+  }, [filteredStats, deliverySort]);
+
+  const sortedManifestStats = useMemo(() => {
+    return [...filteredStats].map(s => {
+        const total = s.comMdfe + s.semMdfe;
+        return {
+            ...s,
+            totalEmissoes: total,
+            pctComMdfe: total > 0 ? (s.comMdfe / total) * 100 : 0,
+            pctSemMdfe: total > 0 ? (s.semMdfe / total) * 100 : 0,
+        }
+    }).sort((a, b) => {
+        let valA = 0, valB = 0;
+        if (manifestSort.field === 'unidade') return manifestSort.dir === 'asc' ? a.unidade.localeCompare(b.unidade) : b.unidade.localeCompare(a.unidade);
+        if (manifestSort.field === 'totalEmissoes') { valA = a.totalEmissoes; valB = b.totalEmissoes; }
+        if (manifestSort.field === 'pctComMdfe') { valA = a.pctComMdfe; valB = b.pctComMdfe; }
+        if (manifestSort.field === 'pctSemMdfe') { valA = a.pctSemMdfe; valB = b.pctSemMdfe; }
+        return manifestSort.dir === 'asc' ? valA - valB : valB - valA;
+    });
+  }, [filteredStats, manifestSort]);
+
+
+  // --- EXPORTAÇÃO ---
+
+  const handleDownloadImage = async (ref: React.RefObject<HTMLDivElement>, type: string, fileName: string) => {
+    if (!ref.current) return;
+    setIsExporting(type);
     try {
       await new Promise(r => setTimeout(r, 500));
-      const dataUrl = await toJpeg(exportContainerRef.current, { 
+      const dataUrl = await toJpeg(ref.current, { 
         quality: 0.95, 
         backgroundColor: '#ffffff', 
         pixelRatio: 2 
       });
       const link = document.createElement('a');
-      link.download = `Ranking_SLE_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.jpeg`;
+      link.download = `${fileName}_${new Date().toLocaleDateString('pt-BR').replace(/\//g, '-')}.jpeg`;
       link.href = dataUrl; 
       link.click();
     } catch (err) { 
       console.error(err);
       alert('Erro ao gerar imagem.'); 
     } finally { 
-      setIsExporting(false); 
+      setIsExporting(null); 
     }
   };
 
-  const SortIcon = ({ column }: { column: SortField }) => {
-    if (sortField !== column) return <ArrowUpDown className="w-2.5 h-2.5 ml-0.5 opacity-20" />;
-    return sortDirection === 'asc' ? <ArrowUp className="w-2.5 h-2.5 ml-0.5 text-sle-primary" /> : <ArrowDown className="w-2.5 h-2.5 ml-0.5 text-sle-primary" />;
+  const SortIcon = ({ active, dir }: { active: boolean, dir: SortDirection }) => {
+    if (!active) return <ArrowUpDown className="w-2.5 h-2.5 ml-0.5 opacity-20" />;
+    return dir === 'asc' ? <ArrowUp className="w-2.5 h-2.5 ml-0.5 text-sle-primary" /> : <ArrowDown className="w-2.5 h-2.5 ml-0.5 text-sle-primary" />;
   };
 
   return (
     <div className="space-y-6 animate-fade-in pb-10 px-1 sm:px-0">
       
-      {/* Container Oculto para Exportação */}
+      {/* CONTAINERS OCULTOS PARA EXPORTAÇÃO */}
+      {/* 1. SALES EXPORT */}
       <div style={{ position: 'absolute', left: '-9999px', top: '0' }}>
-        <div ref={exportContainerRef} className="bg-white p-10 w-[1100px] font-sans">
-           <div className="flex justify-between items-end mb-8 border-b-2 border-sle-primary pb-6">
-              <div>
-                 <h1 className="text-4xl font-bold text-sle-dark mb-1">SÃO LUIZ EXPRESS</h1>
-                 <p className="text-sm font-semibold text-gray-400 uppercase tracking-widest">Painel Operacional • {new Date().toLocaleDateString('pt-BR')}</p>
-              </div>
-              <div className="text-right">
-                 <p className="text-xs font-bold text-sle-primary uppercase tracking-wider mb-1">Faturamento Geral</p>
-                 <p className="text-3xl font-bold text-sle-dark">{totalStats.faturamento.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</p>
-              </div>
-           </div>
-           
-           <table className="w-full text-base text-left border-collapse">
-              <thead className="bg-[#F8F9FE] text-[#24268B]">
+         <div ref={exportSalesRef} className="bg-white p-10 w-[1100px] font-sans">
+            <h1 className="text-2xl font-bold mb-4 text-sle-dark border-b-2 border-sle-primary pb-2">RANKING DE VENDAS</h1>
+            <table className="w-full text-base text-left border-collapse">
+               <thead className="bg-[#F8F9FE] text-[#24268B]">
                  <tr>
-                   <th className="px-4 py-5 font-bold uppercase border-b-2 border-gray-100">Unidade</th>
-                   <th className="px-4 py-5 text-right font-bold uppercase border-b-2 border-gray-100">Vendas</th>
-                   <th className="px-4 py-5 text-right font-bold uppercase border-b-2 border-gray-100">Projeção</th>
-                   <th className="px-4 py-5 text-center font-bold uppercase border-b-2 border-gray-100">% Proj</th>
-                   <th className="px-4 py-5 text-center font-bold uppercase border-b-2 border-gray-100">Entrega</th>
+                    <th className="p-4 border-b">Unidade</th>
+                    <th className="p-4 border-b text-right">Vendas</th>
+                    <th className="p-4 border-b text-right">Projeção</th>
+                    <th className="p-4 border-b text-center">% Projeção</th>
                  </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                 {sortedStats.map((stat) => {
-                   const tB = stat.baixaNoPrazo + stat.baixaForaPrazo + stat.semBaixa;
-                   const pN = tB > 0 ? (stat.baixaNoPrazo / tB) * 100 : 0;
-                   return (
-                     <tr key={stat.unidade} className="bg-white">
-                       <td className="px-4 py-6 font-bold text-sle-dark uppercase border-b border-gray-50">{stat.unidade}</td>
-                       <td className="px-4 py-6 text-right text-gray-600 font-semibold border-b border-gray-50">{stat.faturamento.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</td>
-                       <td className="px-4 py-6 text-right text-sle-primary font-bold border-b border-gray-50">{stat.projecao.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</td>
-                       <td className="px-4 py-6 text-center border-b border-gray-50">
-                         <span className={`px-3 py-1.5 rounded-md text-xs font-bold ${stat.percentualProjecao >= 100 ? 'text-green-700 bg-green-50' : 'text-red-700 bg-red-50'}`}>{stat.percentualProjecao.toFixed(0)}%</span>
-                       </td>
-                       <td className="px-4 py-6 text-center border-b border-gray-50">
-                          <span className={`text-xs font-bold px-3 py-1.5 rounded-md ${pN >= 90 ? 'text-green-700 bg-green-50' : 'text-red-700 bg-red-50'}`}>{pN.toFixed(0)}%</span>
-                       </td>
-                     </tr>
-                   );
-                 })}
-              </tbody>
-           </table>
-           <div className="mt-12 pt-6 border-t border-gray-100 text-center">
-              <p className="text-[10px] text-gray-300 font-bold uppercase tracking-[0.6em]">Documento gerado automaticamente pelo Sistema SLE</p>
-           </div>
-        </div>
+               </thead>
+               <tbody>
+                  {sortedSalesStats.map(s => (
+                      <tr key={s.unidade}>
+                          <td className="p-4 border-b font-bold text-sle-dark">{s.unidade}</td>
+                          <td className="p-4 border-b text-right">{s.faturamento.toLocaleString('pt-BR', {style:'currency', currency:'BRL', maximumFractionDigits:0})}</td>
+                          <td className="p-4 border-b text-right">{s.projecao.toLocaleString('pt-BR', {style:'currency', currency:'BRL', maximumFractionDigits:0})}</td>
+                          <td className="p-4 border-b text-center">
+                             <span className={`px-2 py-1 rounded font-bold text-sm ${s.percentualProjecao >= 100 ? 'text-green-700 bg-green-50' : 'text-red-700 bg-red-50'}`}>{s.percentualProjecao.toFixed(0)}%</span>
+                          </td>
+                      </tr>
+                  ))}
+               </tbody>
+            </table>
+            <div className="mt-8 text-center text-xs text-gray-400">Gerado pelo Sistema SLE - {new Date().toLocaleDateString()}</div>
+         </div>
       </div>
+
+      {/* 2. DELIVERY EXPORT */}
+      <div style={{ position: 'absolute', left: '-9999px', top: '0' }}>
+         <div ref={exportDeliveryRef} className="bg-white p-10 w-[1100px] font-sans">
+            <h1 className="text-2xl font-bold mb-4 text-sle-dark border-b-2 border-warning pb-2">RANKING DE PENDÊNCIAS (ENTREGA)</h1>
+            <table className="w-full text-base text-left border-collapse">
+               <thead className="bg-[#F8F9FE] text-[#24268B]">
+                 <tr>
+                    <th className="p-4 border-b">Unidade</th>
+                    <th className="p-4 border-b text-center">Total Recebimentos</th>
+                    <th className="p-4 border-b text-center">% No Prazo</th>
+                    <th className="p-4 border-b text-center">% Sem Baixa</th>
+                    <th className="p-4 border-b text-center">% Atraso</th>
+                 </tr>
+               </thead>
+               <tbody>
+                  {sortedDeliveryStats.map(s => (
+                      <tr key={s.unidade}>
+                          <td className="p-4 border-b font-bold text-sle-dark">{s.unidade}</td>
+                          <td className="p-4 border-b text-center font-bold">{s.totalRecebimentos}</td>
+                          <td className="p-4 border-b text-center text-green-700 font-bold">{s.pctNoPrazo.toFixed(0)}%</td>
+                          <td className="p-4 border-b text-center text-yellow-600 font-bold">{s.pctSemBaixa.toFixed(0)}%</td>
+                          <td className="p-4 border-b text-center text-red-600 font-bold">{s.pctForaPrazo.toFixed(0)}%</td>
+                      </tr>
+                  ))}
+               </tbody>
+            </table>
+            <div className="mt-8 text-center text-xs text-gray-400">Gerado pelo Sistema SLE - {new Date().toLocaleDateString()}</div>
+         </div>
+      </div>
+
+      {/* 3. MANIFEST EXPORT */}
+      <div style={{ position: 'absolute', left: '-9999px', top: '0' }}>
+         <div ref={exportManifestRef} className="bg-white p-10 w-[1100px] font-sans">
+            <h1 className="text-2xl font-bold mb-4 text-sle-dark border-b-2 border-danger pb-2">RANKING DE MANIFESTOS</h1>
+            <table className="w-full text-base text-left border-collapse">
+               <thead className="bg-[#F8F9FE] text-[#24268B]">
+                 <tr>
+                    <th className="p-4 border-b">Unidade</th>
+                    <th className="p-4 border-b text-center">Total Emissões</th>
+                    <th className="p-4 border-b text-center">% Com MDFE</th>
+                    <th className="p-4 border-b text-center">% Sem MDFE</th>
+                 </tr>
+               </thead>
+               <tbody>
+                  {sortedManifestStats.map(s => (
+                      <tr key={s.unidade}>
+                          <td className="p-4 border-b font-bold text-sle-dark">{s.unidade}</td>
+                          <td className="p-4 border-b text-center font-bold">{s.totalEmissoes}</td>
+                          <td className="p-4 border-b text-center text-green-700 font-bold">{s.pctComMdfe.toFixed(0)}%</td>
+                          <td className="p-4 border-b text-center text-red-600 font-bold">{s.pctSemMdfe.toFixed(0)}%</td>
+                      </tr>
+                  ))}
+               </tbody>
+            </table>
+            <div className="mt-8 text-center text-xs text-gray-400">Gerado pelo Sistema SLE - {new Date().toLocaleDateString()}</div>
+         </div>
+      </div>
+
 
       {/* Toolbar */}
       <div className="bg-white px-4 py-3 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4">
@@ -224,6 +309,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, allCtes, onS
         </div>
       </div>
 
+      {/* KPI Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* FATURAMENTO CARD */}
         <Card title="FATURAMENTO GERAL" icon={<DollarSign className="w-5 h-5 text-sle-primary opacity-50"/>} className="border-l-sle-primary shadow-sm hover:shadow-md transition-shadow">
@@ -251,9 +337,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, allCtes, onS
                    <span className={`text-xl font-bold ${generalPercentProj >= 100 ? 'text-green-600' : 'text-red-600'}`}>{generalPercentProj.toFixed(1)}%</span>
                 </div>
                 <div className="relative w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                    {/* Barra de Projeção (Ghost) */}
                     <div className={`absolute top-0 left-0 h-full transition-all duration-500 opacity-40 ${generalPercentProj >= 100 ? 'bg-green-600' : 'bg-red-600'}`} style={{ width: `${Math.min(generalPercentProj, 100)}%` }}></div>
-                    {/* Barra Atual (Sólida) */}
                     <div className={`absolute top-0 left-0 h-full transition-all duration-500 ${generalPercentProj >= 100 ? 'bg-green-600' : 'bg-red-600'}`} style={{ width: `${Math.min(generalPercentFat, 100)}%` }}></div>
                 </div>
              </div>
@@ -277,27 +361,18 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, allCtes, onS
                 </div>
              </div>
              <div className="grid grid-cols-3 gap-2 items-center text-center h-[90px]">
-               <div 
-                onClick={() => handleSort('noPrazo')}
-                className="flex flex-col border-r border-gray-100 px-1 py-1 cursor-pointer hover:bg-green-50/50 rounded-l-lg transition-colors active:scale-95"
-               >
+               <div className="flex flex-col border-r border-gray-100 px-1 py-1">
                   <span className="text-xl font-bold text-green-700 leading-none">{deliveryStats.noPrazo}</span>
                   <span className="text-[10px] font-semibold text-green-600 bg-green-50/50 rounded-md mt-2 py-0.5">{deliveryStats.pctNoPrazo.toFixed(0)}% OK</span>
                </div>
-               <div 
-                onClick={() => handleSort('semBaixa')}
-                className="flex flex-col bg-yellow-50/50 rounded-lg px-2 py-3 border border-yellow-100 shadow-sm cursor-pointer transform scale-105 transition-all hover:scale-110 active:scale-100"
-               >
+               <div className="flex flex-col bg-yellow-50/50 rounded-lg px-2 py-3 border border-yellow-100 shadow-sm transform scale-105 transition-transform hover:scale-110">
                   <AlertTriangle className="w-4 h-4 text-yellow-600 mx-auto mb-1" />
                   <span className="text-2xl font-bold text-yellow-700 leading-none">{deliveryStats.semBaixa}</span>
                   <span className="text-[10px] font-bold text-yellow-600 mt-1 uppercase tracking-tighter">{deliveryStats.pctSemBaixa.toFixed(0)}% PEND</span>
                </div>
-               <div 
-                onClick={() => handleSort('foraPrazo')}
-                className="flex flex-col border-l border-gray-100 px-1 py-1 cursor-pointer hover:bg-red-50/50 rounded-r-lg transition-colors active:scale-95"
-               >
+               <div className="flex flex-col border-l border-gray-100 px-1 py-1">
                   <span className="text-xl font-bold text-red-700 leading-none">{deliveryStats.foraPrazo}</span>
-                  <span className="text-[10px] font-semibold text-red-600 bg-red-50/50 rounded-md mt-2 py-0.5">ATRASO</span>
+                  <span className="text-[10px] font-semibold text-red-600 bg-red-50/50 rounded-md mt-2 py-0.5">{deliveryStats.pctForaPrazo.toFixed(0)}% ATRASO</span>
                </div>
              </div>
            </div>
@@ -306,20 +381,14 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, allCtes, onS
         {/* MANIFESTOS CARD */}
         <Card title="MANIFESTOS" icon={<FileText className="w-5 h-5 text-danger opacity-50"/>} className="border-l-danger shadow-sm hover:shadow-md transition-shadow">
            <div className="flex flex-col gap-3 py-1 justify-center min-h-[140px]">
-              <div 
-                onClick={() => handleSort('faturamento')} // Poderia ser cobertura mas usamos vendas como prox
-                className="flex justify-between items-center p-4 rounded-lg bg-green-50/40 border border-green-100 cursor-pointer hover:bg-green-100/50 transition-colors active:scale-95"
-              >
+              <div className="flex justify-between items-center p-4 rounded-lg bg-green-50/40 border border-green-100">
                 <div className="flex flex-col">
                   <span className="text-[10px] font-semibold text-green-800 uppercase tracking-tight leading-none">Com MDFE</span>
                   <span className="text-[9px] font-medium text-green-600 mt-1">{((totalStats.comMdfe / Math.max(1, totalStats.comMdfe + totalStats.semMdfe)) * 100).toFixed(0)}% Cobertura</span>
                 </div>
                 <span className="font-bold text-2xl text-green-600 leading-none">{totalStats.comMdfe}</span>
               </div>
-              <div 
-                onClick={() => handleSort('semMdfe')}
-                className="flex justify-between items-center p-4 rounded-lg bg-red-50/40 border border-red-100 cursor-pointer hover:bg-red-100/50 transition-colors active:scale-95"
-              >
+              <div className="flex justify-between items-center p-4 rounded-lg bg-red-50/40 border border-red-100">
                 <div className="flex flex-col">
                   <span className="text-[10px] font-semibold text-red-800 uppercase tracking-tight leading-none">Sem MDFE</span>
                   <span className="text-[9px] font-medium text-red-600 mt-1">{((totalStats.semMdfe / Math.max(1, totalStats.comMdfe + totalStats.semMdfe)) * 100).toFixed(0)}% Pendente</span>
@@ -330,81 +399,107 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, allCtes, onS
         </Card>
       </div>
 
-      {/* Ranking Table */}
-      <div id="ranking-unidades" className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100 mt-6">
-        <div className="p-4 border-b border-gray-50 bg-gray-50/30 flex flex-col sm:flex-row justify-between items-center gap-4">
-          <div className="flex items-center gap-2">
-             <Filter className="text-sle-primary w-4 h-4"/>
-             <h3 className="font-semibold text-[#0F103A] text-xs sm:text-sm uppercase tracking-wider">Ranking Geral de Unidades</h3>
-          </div>
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-             <button disabled={isExporting} onClick={handleDownloadImage} className="flex-1 sm:flex-none flex items-center justify-center bg-[#059669] text-white px-4 py-2.5 rounded-lg shadow-sm text-[10px] sm:text-xs font-semibold uppercase tracking-widest hover:bg-[#047857] active:scale-95 transition-all">
-                {isExporting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <ImageIcon className="w-4 h-4 mr-2" />}
-                {isExporting ? 'Gerando...' : 'Baixar Imagem'}
-             </button>
-             <div className="relative group flex-1 sm:flex-none">
-                <button className="w-full flex items-center justify-center space-x-2 text-[10px] sm:text-xs text-gray-700 bg-white border border-gray-200 py-2.5 px-4 rounded-lg shadow-sm hover:bg-gray-50 font-semibold uppercase tracking-tight">
-                  <ArrowUpDown className="w-4 h-4 text-gray-400" /><span>Ordenar</span><ChevronDown className="w-3.5 h-3.5 text-gray-400" />
-                </button>
-                <div className="absolute top-full right-0 mt-1 w-full min-w-[180px] bg-white border border-gray-100 rounded-xl shadow-xl hidden group-hover:block z-20 overflow-hidden py-1">
-                      {[
-                        { label: 'Faturamento', key: 'faturamento' },
-                        { label: '% Projeção', key: 'projecao' },
-                        { label: '% Entrega', key: 'noPrazo' },
-                        { label: 'Sem MDFE', key: 'semMdfe' }
-                      ].map(f => (
-                        <button key={f.key} onClick={() => { setSortField(f.key as SortField); setSortDirection('desc'); }} className={`block w-full text-left px-4 py-2.5 text-[10px] font-semibold hover:bg-blue-50 text-gray-600 uppercase tracking-wider transition-colors ${sortField === f.key ? 'bg-blue-50 text-sle-primary' : ''}`}>{f.label}</button>
-                      ))}
+      {/* CHART SECTION */}
+      <DailyRevenueChart ctes={allCtes} />
+
+      {/* --- RANKING TABLES GRID --- */}
+      
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mt-8">
+        
+        {/* TABLE 1: SALES RANKING */}
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100 xl:col-span-2">
+            <div className="p-4 border-b border-gray-50 bg-gray-50/30 flex flex-col sm:flex-row justify-between items-center gap-4">
+                <div className="flex items-center gap-2">
+                    <Filter className="text-sle-primary w-4 h-4"/>
+                    <h3 className="font-semibold text-[#0F103A] text-xs sm:text-sm uppercase tracking-wider">Ranking das Unidades em Vendas</h3>
                 </div>
-             </div>
-          </div>
+                <button disabled={isExporting === 'sales'} onClick={() => handleDownloadImage(exportSalesRef, 'sales', 'Ranking_Vendas')} className="bg-[#059669] text-white px-3 py-2 rounded-lg shadow-sm text-[10px] font-semibold uppercase tracking-widest hover:bg-[#047857] active:scale-95 transition-all flex items-center">
+                    {isExporting === 'sales' ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" /> : <ImageIcon className="w-3.5 h-3.5 mr-2" />}
+                    Baixar Imagem
+                </button>
+            </div>
+            <div className="w-full overflow-x-auto">
+                <table className="w-full text-[10px] sm:text-sm text-left table-fixed min-w-[500px]">
+                    <thead className="bg-[#F8F9FE] text-[#24268B]">
+                    <tr>
+                        <th className="w-[40%] px-3 py-3 font-bold uppercase cursor-pointer hover:bg-blue-100 transition-colors" onClick={() => handleSalesSort('unidade')}>
+                            <div className="flex items-center">UNIDADE <SortIcon active={salesSort.field === 'unidade'} dir={salesSort.dir} /></div>
+                        </th>
+                        <th className="w-[20%] px-2 py-3 text-right font-bold uppercase cursor-pointer hover:bg-blue-100 transition-colors" onClick={() => handleSalesSort('faturamento')}>
+                            <div className="flex items-center justify-end">VENDAS <SortIcon active={salesSort.field === 'faturamento'} dir={salesSort.dir} /></div>
+                        </th>
+                        <th className="w-[20%] px-2 py-3 text-right font-bold uppercase cursor-pointer hover:bg-blue-100 transition-colors" onClick={() => handleSalesSort('projecao')}>
+                            <div className="flex items-center justify-end">PROJEÇÃO <SortIcon active={salesSort.field === 'projecao'} dir={salesSort.dir} /></div>
+                        </th>
+                        <th className="w-[20%] px-2 py-3 text-center font-bold uppercase cursor-pointer hover:bg-blue-100 transition-colors" onClick={() => handleSalesSort('percentualProjecao')}>
+                            <div className="flex items-center justify-center">% PROJEÇÃO <SortIcon active={salesSort.field === 'percentualProjecao'} dir={salesSort.dir} /></div>
+                        </th>
+                    </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                    {sortedSalesStats.map((stat) => (
+                        <tr key={stat.unidade} onClick={() => onSelectUnit(stat.unidade)} className="hover:bg-blue-50/40 cursor-pointer transition-colors">
+                            <td className="px-3 py-3 font-semibold text-[#0F103A] uppercase truncate">{stat.unidade}</td>
+                            <td className="px-2 py-3 text-right text-gray-600 font-semibold">{stat.faturamento.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</td>
+                            <td className="px-2 py-3 text-right text-sle-primary font-bold">{stat.projecao.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</td>
+                            <td className="px-2 py-3 text-center">
+                                <span className={`px-2 py-0.5 rounded-md text-[9px] font-bold ${stat.percentualProjecao >= 100 ? 'text-green-700 bg-green-50' : 'text-red-700 bg-red-50'}`}>{stat.percentualProjecao.toFixed(0)}%</span>
+                            </td>
+                        </tr>
+                    ))}
+                    </tbody>
+                </table>
+            </div>
         </div>
 
-        <div className="w-full overflow-x-auto">
-          <table className="w-full text-[10px] sm:text-sm text-left table-fixed min-w-[500px]">
-            <thead className="bg-[#F8F9FE] text-[#24268B]">
-               <tr>
-                 <th className="w-[35%] px-3 py-4 font-bold uppercase truncate tracking-tight cursor-pointer hover:bg-blue-100 transition-colors group" onClick={() => handleSort('unidade')}>
-                    <div className="flex items-center">UNIDADE <SortIcon column="unidade" /></div>
-                 </th>
-                 <th className="w-[22%] px-2 py-4 text-right font-bold uppercase truncate tracking-tight cursor-pointer hover:bg-blue-100 transition-colors group" onClick={() => handleSort('faturamento')}>
-                    <div className="flex items-center justify-end">VENDAS <SortIcon column="faturamento" /></div>
-                 </th>
-                 <th className="w-[20%] px-2 py-4 text-right font-bold uppercase truncate tracking-tight cursor-pointer hover:bg-blue-100 transition-colors group" onClick={() => handleSort('projecao')}>
-                    <div className="flex items-center justify-end">PROJ <SortIcon column="projecao" /></div>
-                 </th>
-                 <th className="w-[11%] px-1 py-4 text-center font-bold uppercase truncate tracking-tight cursor-pointer hover:bg-blue-100 transition-colors group" onClick={() => handleSort('projecao')}>
-                    <div className="flex items-center justify-center">% <SortIcon column="projecao" /></div>
-                 </th>
-                 <th className="w-[12%] px-1 py-4 text-center font-bold uppercase truncate tracking-tight cursor-pointer hover:bg-blue-100 transition-colors group" onClick={() => handleSort('noPrazo')}>
-                    <div className="flex items-center justify-center">OK <SortIcon column="noPrazo" /></div>
-                 </th>
-               </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-               {sortedStats.map((stat) => {
-                 const tB = stat.baixaNoPrazo + stat.baixaForaPrazo + stat.semBaixa;
-                 const pN = tB > 0 ? (stat.baixaNoPrazo / tB) * 100 : 0;
-                 return (
-                   <tr key={stat.unidade} onClick={() => onSelectUnit(stat.unidade)} className="hover:bg-blue-50/40 active:bg-blue-100/50 cursor-pointer transition-colors group">
-                     <td className="px-3 py-4 font-semibold text-[#0F103A] uppercase truncate group-hover:text-sle-primary">{stat.unidade}</td>
-                     <td className="px-2 py-4 text-right text-gray-600 font-semibold truncate leading-none">{stat.faturamento.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</td>
-                     <td className="px-2 py-4 text-right text-sle-primary font-bold truncate leading-none">{stat.projecao.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</td>
-                     <td className="px-1 py-4 text-center">
-                       <span className={`inline-block px-2 py-0.5 rounded-md text-[9px] font-bold ${stat.percentualProjecao >= 100 ? 'text-green-700 bg-green-50' : 'text-red-700 bg-red-50'}`}>{stat.percentualProjecao.toFixed(0)}%</span>
-                     </td>
-                     <td className="px-1 py-4 text-center">
-                        <span className={`inline-block text-[9px] font-bold px-2 py-0.5 rounded-md ${pN >= 90 ? 'text-green-700 bg-green-50' : 'text-red-700 bg-red-50'}`}>{pN.toFixed(0)}%</span>
-                     </td>
-                   </tr>
-                 );
-               })}
-               {sortedStats.length === 0 && (
-                <tr><td colSpan={5} className="px-6 py-12 text-center text-gray-400 italic">Nenhuma unidade encontrada</td></tr>
-               )}
-            </tbody>
-          </table>
+        {/* TABLE 2: DELIVERY RANKING */}
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
+            <div className="p-4 border-b border-gray-50 bg-gray-50/30 flex flex-col sm:flex-row justify-between items-center gap-4">
+                <div className="flex items-center gap-2">
+                    <Truck className="text-warning w-4 h-4"/>
+                    <h3 className="font-semibold text-[#0F103A] text-xs sm:text-sm uppercase tracking-wider">Ranking Pendências de Entrega</h3>
+                </div>
+                <button disabled={isExporting === 'delivery'} onClick={() => handleDownloadImage(exportDeliveryRef, 'delivery', 'Ranking_Entregas')} className="bg-[#059669] text-white px-3 py-2 rounded-lg shadow-sm text-[10px] font-semibold uppercase tracking-widest hover:bg-[#047857] active:scale-95 transition-all flex items-center">
+                    {isExporting === 'delivery' ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" /> : <ImageIcon className="w-3.5 h-3.5 mr-2" />}
+                    Baixar
+                </button>
+            </div>
+            <div className="w-full overflow-x-auto">
+                <table className="w-full text-[10px] sm:text-sm text-left table-fixed min-w-[400px]">
+                    <thead className="bg-[#F8F9FE] text-[#24268B]">
+                    <tr>
+                        <th className="w-[30%] px-2 py-3 font-bold uppercase cursor-pointer" onClick={() => handleDeliverySort('unidade')}>
+                            <div className="flex items-center truncate">UNID <SortIcon active={deliverySort.field === 'unidade'} dir={deliverySort.dir} /></div>
+                        </th>
+                        <th className="w-[15%] px-1 py-3 text-center font-bold uppercase cursor-pointer" onClick={() => handleDeliverySort('totalRecebimentos')}>
+                           <div className="flex items-center justify-center">QTD <SortIcon active={deliverySort.field === 'totalRecebimentos'} dir={deliverySort.dir} /></div>
+                        </th>
+                        <th className="w-[18%] px-1 py-3 text-center font-bold uppercase cursor-pointer" onClick={() => handleDeliverySort('pctNoPrazo')}>
+                           <div className="flex items-center justify-center">% OK <SortIcon active={deliverySort.field === 'pctNoPrazo'} dir={deliverySort.dir} /></div>
+                        </th>
+                        <th className="w-[19%] px-1 py-3 text-center font-bold uppercase cursor-pointer" onClick={() => handleDeliverySort('pctSemBaixa')}>
+                           <div className="flex items-center justify-center">% PEND <SortIcon active={deliverySort.field === 'pctSemBaixa'} dir={deliverySort.dir} /></div>
+                        </th>
+                        <th className="w-[18%] px-1 py-3 text-center font-bold uppercase cursor-pointer" onClick={() => handleDeliverySort('pctForaPrazo')}>
+                           <div className="flex items-center justify-center">% ATR <SortIcon active={deliverySort.field === 'pctForaPrazo'} dir={deliverySort.dir} /></div>
+                        </th>
+                    </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                    {sortedDeliveryStats.map((stat) => (
+                        <tr key={stat.unidade} onClick={() => onSelectUnit(stat.unidade)} className="hover:bg-blue-50/40 cursor-pointer transition-colors">
+                            <td className="px-2 py-3 font-semibold text-[#0F103A] uppercase truncate">{stat.unidade}</td>
+                            <td className="px-1 py-3 text-center font-bold">{stat.totalRecebimentos}</td>
+                            <td className="px-1 py-3 text-center text-green-600 font-bold">{stat.pctNoPrazo.toFixed(0)}%</td>
+                            <td className="px-1 py-3 text-center text-yellow-600 font-bold">{stat.pctSemBaixa.toFixed(0)}%</td>
+                            <td className="px-1 py-3 text-center text-red-600 font-bold">{stat.pctForaPrazo.toFixed(0)}%</td>
+                        </tr>
+                    ))}
+                    </tbody>
+                </table>
+            </div>
         </div>
+
       </div>
     </div>
   );
