@@ -165,7 +165,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, allCtes, onS
 
   // --- EXPORTAÇÃO ---
 
-  const handleDownloadImage = async (ref: React.RefObject<HTMLDivElement>, type: string, fileName: string) => {
+  const handleDownloadImage = async (ref: React.RefObject<HTMLDivElement | null>, type: string, fileName: string) => {
     if (!ref.current) return;
     setIsExporting(type);
     try {
@@ -493,6 +493,50 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, allCtes, onS
                             <td className="px-1 py-3 text-center text-green-600 font-bold">{stat.pctNoPrazo.toFixed(0)}%</td>
                             <td className="px-1 py-3 text-center text-yellow-600 font-bold">{stat.pctSemBaixa.toFixed(0)}%</td>
                             <td className="px-1 py-3 text-center text-red-600 font-bold">{stat.pctForaPrazo.toFixed(0)}%</td>
+                        </tr>
+                    ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        {/* TABLE 3: MANIFEST RANKING */}
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
+            <div className="p-4 border-b border-gray-50 bg-gray-50/30 flex flex-col sm:flex-row justify-between items-center gap-4">
+                <div className="flex items-center gap-2">
+                    <FileText className="text-danger w-4 h-4"/>
+                    <h3 className="font-semibold text-[#0F103A] text-xs sm:text-sm uppercase tracking-wider">Ranking de Manifestos</h3>
+                </div>
+                <button disabled={isExporting === 'manifest'} onClick={() => handleDownloadImage(exportManifestRef, 'manifest', 'Ranking_Manifestos')} className="bg-[#059669] text-white px-3 py-2 rounded-lg shadow-sm text-[10px] font-semibold uppercase tracking-widest hover:bg-[#047857] active:scale-95 transition-all flex items-center">
+                    {isExporting === 'manifest' ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" /> : <ImageIcon className="w-3.5 h-3.5 mr-2" />}
+                    Baixar
+                </button>
+            </div>
+            <div className="w-full overflow-x-auto">
+                <table className="w-full text-[10px] sm:text-sm text-left table-fixed min-w-[400px]">
+                    <thead className="bg-[#F8F9FE] text-[#24268B]">
+                    <tr>
+                        <th className="w-[35%] px-2 py-3 font-bold uppercase cursor-pointer" onClick={() => handleManifestSort('unidade')}>
+                            <div className="flex items-center truncate">UNID <SortIcon active={manifestSort.field === 'unidade'} dir={manifestSort.dir} /></div>
+                        </th>
+                        <th className="w-[20%] px-1 py-3 text-center font-bold uppercase cursor-pointer" onClick={() => handleManifestSort('totalEmissoes')}>
+                           <div className="flex items-center justify-center">QTD <SortIcon active={manifestSort.field === 'totalEmissoes'} dir={manifestSort.dir} /></div>
+                        </th>
+                        <th className="w-[22%] px-1 py-3 text-center font-bold uppercase cursor-pointer" onClick={() => handleManifestSort('pctComMdfe')}>
+                           <div className="flex items-center justify-center">% COM <SortIcon active={manifestSort.field === 'pctComMdfe'} dir={manifestSort.dir} /></div>
+                        </th>
+                        <th className="w-[23%] px-1 py-3 text-center font-bold uppercase cursor-pointer" onClick={() => handleManifestSort('pctSemMdfe')}>
+                           <div className="flex items-center justify-center">% SEM <SortIcon active={manifestSort.field === 'pctSemMdfe'} dir={manifestSort.dir} /></div>
+                        </th>
+                    </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                    {sortedManifestStats.map((stat) => (
+                        <tr key={stat.unidade} onClick={() => onSelectUnit(stat.unidade)} className="hover:bg-blue-50/40 cursor-pointer transition-colors">
+                            <td className="px-2 py-3 font-semibold text-[#0F103A] uppercase truncate">{stat.unidade}</td>
+                            <td className="px-1 py-3 text-center font-bold">{stat.totalEmissoes}</td>
+                            <td className="px-1 py-3 text-center text-green-600 font-bold">{stat.pctComMdfe.toFixed(0)}%</td>
+                            <td className="px-1 py-3 text-center text-red-600 font-bold">{stat.pctSemMdfe.toFixed(0)}%</td>
                         </tr>
                     ))}
                     </tbody>
