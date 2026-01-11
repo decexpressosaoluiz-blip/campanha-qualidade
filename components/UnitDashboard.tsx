@@ -16,13 +16,14 @@ interface UnitDashboardProps {
   lastUpdate: Date;
   allCtes: Cte[];
   fixedDays: { total: number; elapsed: number };
+  dateRange: { start: string, end: string };
 }
 
 type TabType = 'vendas' | 'baixas' | 'manifestos';
 type SortKey = 'data' | 'id' | 'valor' | 'statusPrazo' | 'statusMdfe' | 'unidadeEntrega';
 type SortDirection = 'asc' | 'desc';
 
-const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderActions, lastUpdate, allCtes, fixedDays }) => {
+const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderActions, lastUpdate, allCtes, fixedDays, dateRange }) => {
   const [activeTab, setActiveTab] = useState<TabType>('vendas');
   const [baixaFilter, setBaixaFilter] = useState<'all' | 'noPrazo' | 'foraPrazo' | 'semBaixa'>('all');
   const [mdfeFilter, setMdfeFilter] = useState<'all' | 'comMdfe' | 'semMdfe'>('all');
@@ -120,6 +121,17 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
     return sortConfig.direction === 'asc' ? <ArrowUp className="w-2.5 h-2.5 ml-0.5 text-sle-primary" /> : <ArrowDown className="w-2.5 h-2.5 ml-0.5 text-sle-primary" />;
   };
 
+  const chartStart = dateRange.start ? new Date(dateRange.start + 'T00:00:00') : undefined;
+  const chartEnd = dateRange.end ? new Date(dateRange.end + 'T23:59:59') : undefined;
+
+  // Determine which date to show as "Vendas do dia" label
+  // Logic: Use Filter End Date OR Last Update Date. 
+  // If Filter End Date > Last Update Date, use Last Update Date to avoid showing future dates.
+  const filterEndDate = dateRange.end ? new Date(dateRange.end + 'T12:00:00') : lastUpdate;
+  const effectiveDate = filterEndDate > lastUpdate ? lastUpdate : filterEndDate;
+  const salesLabelDate = new Date(effectiveDate);
+  salesLabelDate.setDate(salesLabelDate.getDate() - 1);
+
   return (
     <div className="space-y-6 animate-fade-in pb-10 px-0 sm:px-0">
       {/* Header section with actions */}
@@ -177,7 +189,7 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
 
              <div className="space-y-2">
                 <div className="bg-blue-50/40 border border-blue-100/50 rounded-lg p-2.5 flex justify-between items-center cursor-pointer hover:bg-blue-100/50 transition-colors active:scale-[0.98]" onClick={() => { setActiveTab('vendas'); setSortConfig({ key: 'data', direction: 'asc' }); }}>
-                    <span className="text-[10px] font-semibold text-blue-800 uppercase tracking-tight">Vendas dia {lastUpdate.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'})}</span>
+                    <span className="text-[10px] font-semibold text-blue-800 uppercase tracking-tight">Vendas dia {salesLabelDate.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'})}</span>
                     <span className="text-sm font-bold text-[#2E31B4]">{stats.vendasDiaAnterior.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</span>
                 </div>
                 <div className="bg-orange-50/40 border border-orange-100/50 rounded-lg p-2.5 flex justify-between items-center">
@@ -253,7 +265,7 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
       </div>
 
       {/* Chart Section - Specific for Unit */}
-      <DailyRevenueChart ctes={allCtes} unitName={stats.unidade} />
+      <DailyRevenueChart ctes={allCtes} unitName={stats.unidade} startDate={chartStart} endDate={chartEnd} />
 
       {/* List Table Section */}
       <div id="listagem-documentos" className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100 mt-4 mx-2 sm:mx-0">

@@ -140,13 +140,21 @@ const App: React.FC = () => {
       </div>
     );
     if (view === DashboardView.LOGIN) return <Login onLogin={handleLogin} loading={loading} error={loginError} />;
+    
+    // Configuração robusta de datas para cálculo
+    // Força o horário 12:00:00 para evitar problemas de fuso horário ao converter string YYYY-MM-DD para Date
+    const calculationDateRange = {
+      start: dateRange.start ? new Date(dateRange.start + 'T12:00:00') : null,
+      end: dateRange.end ? new Date(dateRange.end + 'T12:00:00') : null
+    };
+
     if (view === DashboardView.MANAGER && data) {
-      const stats = calculateStats(data, undefined, { start: dateRange.start ? new Date(dateRange.start) : null, end: dateRange.end ? new Date(dateRange.end) : null });
+      const stats = calculateStats(data, undefined, calculationDateRange);
       return <ManagerDashboard stats={stats} allCtes={data.ctes} onSelectUnit={(u) => { setSelectedUnit(u); setView(DashboardView.UNIT_DETAIL); }} onDateFilterChange={(start, end) => setDateRange({ start, end })} dateRange={dateRange} lastUpdate={data.lastUpdate} fixedDays={data.fixedDays} />;
     }
     if (view === DashboardView.UNIT_DETAIL && data && selectedUnit) {
-      const stats = calculateStats(data, selectedUnit, { start: dateRange.start ? new Date(dateRange.start) : null, end: dateRange.end ? new Date(dateRange.end) : null });
-      return <UnitDashboard stats={stats[0]} user={user} onBack={() => setView(DashboardView.MANAGER)} setHeaderActions={setHeaderActions} lastUpdate={data.lastUpdate} allCtes={data.ctes} fixedDays={data.fixedDays} />;
+      const stats = calculateStats(data, selectedUnit, calculationDateRange);
+      return <UnitDashboard stats={stats[0]} user={user} onBack={() => setView(DashboardView.MANAGER)} setHeaderActions={setHeaderActions} lastUpdate={data.lastUpdate} allCtes={data.ctes} fixedDays={data.fixedDays} dateRange={dateRange} />;
     }
     return null;
   };

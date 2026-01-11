@@ -192,6 +192,17 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, allCtes, onS
     return dir === 'asc' ? <ArrowUp className="w-2.5 h-2.5 ml-0.5 text-sle-primary" /> : <ArrowDown className="w-2.5 h-2.5 ml-0.5 text-sle-primary" />;
   };
 
+  const chartStart = dateRange.start ? new Date(dateRange.start + 'T00:00:00') : undefined;
+  const chartEnd = dateRange.end ? new Date(dateRange.end + 'T23:59:59') : undefined;
+
+  // Determine which date to show as "Vendas do dia" label
+  // Logic: Use Filter End Date OR Last Update Date. 
+  // If Filter End Date > Last Update Date, use Last Update Date to avoid showing future dates.
+  const filterEndDate = dateRange.end ? new Date(dateRange.end + 'T12:00:00') : lastUpdate;
+  const effectiveDate = filterEndDate > lastUpdate ? lastUpdate : filterEndDate;
+  const salesLabelDate = new Date(effectiveDate);
+  salesLabelDate.setDate(salesLabelDate.getDate() - 1);
+
   return (
     <div className="space-y-6 animate-fade-in pb-10 px-1 sm:px-0">
       
@@ -342,7 +353,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, allCtes, onS
                 </div>
              </div>
              <div className="bg-blue-50/40 border border-blue-100/50 rounded-lg p-3 flex justify-between items-center">
-                  <span className="text-[10px] font-semibold text-blue-800 uppercase tracking-tight">Vendas do dia {lastUpdate.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'})}</span>
+                  <span className="text-[10px] font-semibold text-blue-800 uppercase tracking-tight">Vendas do dia {salesLabelDate.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'})}</span>
                   <span className="text-sm font-bold text-[#2E31B4]">
                     {totalStats.vendasDiaAnterior.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}
                   </span>
@@ -400,7 +411,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, allCtes, onS
       </div>
 
       {/* CHART SECTION */}
-      <DailyRevenueChart ctes={allCtes} />
+      <DailyRevenueChart ctes={allCtes} startDate={chartStart} endDate={chartEnd} />
 
       {/* --- RANKING TABLES GRID --- */}
       

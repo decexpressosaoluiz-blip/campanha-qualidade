@@ -93,15 +93,31 @@ export const calculateStats = (
   const filterStart = dateRange?.start ? new Date(dateRange.start.getFullYear(), dateRange.start.getMonth(), dateRange.start.getDate(), 0,0,0) : null;
   const filterEnd = dateRange?.end ? new Date(dateRange.end.getFullYear(), dateRange.end.getMonth(), dateRange.end.getDate(), 23,59,59) : null;
 
-  // Para o cálculo do dia anterior, usamos a data da última atualização carregada
-  const lastUpdateStr = data.lastUpdate.toISOString().split('T')[0];
+  // Define a data base de referência.
+  // Se houver filtro de data, usa a data final do filtro.
+  // IMPORTANTE: Se a data final do filtro for FUTURA em relação à última atualização, 
+  // limitamos à última atualização para não mostrar vendas de um dia que não existe (futuro).
+  let baseReferenceDate = data.lastUpdate;
+  if (dateRange?.end) {
+    if (dateRange.end > data.lastUpdate) {
+      baseReferenceDate = data.lastUpdate;
+    } else {
+      baseReferenceDate = dateRange.end;
+    }
+  }
+
+  // A regra de negócio exige que as vendas do dia sejam D-1 da data de referência.
+  const targetSalesDate = new Date(baseReferenceDate);
+  targetSalesDate.setDate(targetSalesDate.getDate() - 1);
+  const targetDateStr = targetSalesDate.toISOString().split('T')[0];
 
   // Process CTEs
   data.ctes.forEach(cte => {
-    // Cálculo do faturamento do dia da atualização (independente do filtro de período do dashboard)
+    // Cálculo do faturamento do dia alvo (Data Referência - 1 dia)
     const cteDateStr = cte.data.toISOString().split('T')[0];
-    const isLastDay = cteDateStr === lastUpdateStr;
+    const isTargetDay = cteDateStr === targetDateStr;
 
+    // Aplica o filtro global de período nas contagens gerais
     if (hasDateFilter && filterStart && filterEnd) {
       if (cte.data < filterStart || cte.data > filterEnd) return; 
     }
@@ -112,7 +128,7 @@ export const calculateStats = (
       stats.faturamento += cte.valor;
       stats.docsVendas.push(cte);
       
-      if (isLastDay) {
+      if (isTargetDay) {
         stats.vendasDiaAnterior += cte.valor;
       }
 
