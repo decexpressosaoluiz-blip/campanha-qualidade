@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { UnitStats, Cte, User } from '../types';
 import Card from './Card';
-import { DollarSign, Truck, FileText, CheckCircle, AlertTriangle, XCircle, Download, ArrowUpDown, ExternalLink, Clock, ArrowUp, ArrowDown } from 'lucide-react';
+import { DollarSign, Truck, FileText, CheckCircle, AlertTriangle, XCircle, Download, ArrowUpDown, ExternalLink, Clock, ArrowUp, ArrowDown, Calendar } from 'lucide-react';
 import { downloadXLS } from '../services/excelService';
 import { LINKS } from '../constants';
 import { normalizeStatus } from '../services/calculationService';
@@ -17,20 +17,18 @@ interface UnitDashboardProps {
   allCtes: Cte[];
   fixedDays: { total: number; elapsed: number };
   dateRange: { start: string, end: string };
+  onDateFilterChange: (start: string, end: string) => void;
 }
 
 type TabType = 'vendas' | 'baixas' | 'manifestos';
 type SortKey = 'data' | 'id' | 'valor' | 'statusPrazo' | 'statusMdfe' | 'unidadeEntrega';
 type SortDirection = 'asc' | 'desc';
 
-const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderActions, lastUpdate, allCtes, fixedDays, dateRange }) => {
+const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderActions, lastUpdate, allCtes, fixedDays, dateRange, onDateFilterChange }) => {
   const [activeTab, setActiveTab] = useState<TabType>('vendas');
   const [baixaFilter, setBaixaFilter] = useState<'all' | 'noPrazo' | 'foraPrazo' | 'semBaixa'>('all');
   const [mdfeFilter, setMdfeFilter] = useState<'all' | 'comMdfe' | 'semMdfe'>('all');
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection }>({ key: 'data', direction: 'desc' });
-
-  const defaultDeliveryEnd = lastUpdate.toISOString().split('T')[0];
-  const [deliveryFilter, setDeliveryFilter] = useState({ start: '', end: defaultDeliveryEnd });
 
   const getDocuments = (): Cte[] => {
     let docs: Cte[] = [];
@@ -69,8 +67,9 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
 
   const unitDeliveryStats = useMemo(() => {
     let countNoPrazo = 0, countForaPrazo = 0, countSemBaixa = 0;
-    const start = deliveryFilter.start ? new Date(deliveryFilter.start + 'T00:00:00') : null;
-    const end = deliveryFilter.end ? new Date(deliveryFilter.end + 'T23:59:59') : null;
+    // Usa o dateRange global em vez de filtro local
+    const start = dateRange.start ? new Date(dateRange.start + 'T00:00:00') : null;
+    const end = dateRange.end ? new Date(dateRange.end + 'T23:59:59') : null;
 
     allCtes.forEach(cte => {
       if (!cte.prazoBaixa || cte.unidadeEntrega !== stats.unidade) return;
@@ -92,7 +91,7 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
       pctSemBaixa: total > 0 ? (countSemBaixa / total) * 100 : 0,
       pctForaPrazo: total > 0 ? (countForaPrazo / total) * 100 : 0
     };
-  }, [allCtes, deliveryFilter, stats.unidade]);
+  }, [allCtes, dateRange, stats.unidade]);
 
   // Cálculo da Meta do Dia da Unidade
   const remainingDays = Math.max(1, fixedDays.total - fixedDays.elapsed);
@@ -134,21 +133,42 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
 
   return (
     <div className="space-y-6 animate-fade-in pb-10 px-0 sm:px-0">
-      {/* Header section with actions */}
-      <div className="flex flex-col gap-4 px-2 sm:px-0">
-        <div className="flex flex-col sm:flex-row justify-end items-center gap-2">
-          <button onClick={() => downloadXLS(currentDocs, `Relatorio_${stats.unidade}`)} className="w-full sm:w-auto flex items-center justify-center px-4 py-2.5 bg-[#059669] text-white rounded font-semibold text-xs uppercase shadow-sm hover:bg-[#047857] active:scale-95 transition-all">
-            <Download className="w-4 h-4 mr-2" /> Exportar XLS
-          </button>
-          <a href={LINKS.PENDENCIAS} target="_blank" rel="noreferrer" className="w-full sm:w-auto flex items-center justify-center px-4 py-2.5 bg-[#EC1B23] text-white rounded font-semibold text-xs uppercase shadow-sm hover:bg-[#C41017] active:scale-95 transition-all">
-            <ExternalLink className="w-4 h-4 mr-2" /> Consultar Pendências
-          </a>
+      
+      {/* Header section with actions and title */}
+      <div className="flex flex-col gap-4 px-2 sm:px-0 mb-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-gray-200 pb-4">
+             <div>
+                <h2 className="text-xl sm:text-2xl font-bold text-[#0F103A] tracking-tight">Painel: {stats.unidade}</h2>
+                <p className="text-xs text-gray-400 font-medium uppercase tracking-wider mt-1">Visão Detalhada da Unidade</p>
+             </div>
+             <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                <button onClick={() => downloadXLS(currentDocs, `Relatorio_${stats.unidade}`)} className="w-full sm:w-auto flex items-center justify-center px-4 py-2.5 bg-[#059669] text-white rounded font-semibold text-xs uppercase shadow-sm hover:bg-[#047857] active:scale-95 transition-all">
+                    <Download className="w-4 h-4 mr-2" /> Exportar XLS
+                </button>
+                <a href={LINKS.PENDENCIAS} target="_blank" rel="noreferrer" className="w-full sm:w-auto flex items-center justify-center px-4 py-2.5 bg-[#EC1B23] text-white rounded font-semibold text-xs uppercase shadow-sm hover:bg-[#C41017] active:scale-95 transition-all">
+                    <ExternalLink className="w-4 h-4 mr-2" /> Consultar Pendências
+                </a>
+             </div>
         </div>
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-gray-200 pb-3">
-          <h2 className="text-xl sm:text-2xl font-semibold text-[#0F103A] truncate tracking-tight">Painel: {stats.unidade}</h2>
-          <div className="flex items-center text-[#2E31B4] text-[10px] sm:text-xs font-medium uppercase mt-2 sm:mt-0 bg-blue-50 px-3 py-1 rounded-full w-fit">
-            <Clock className="w-3.5 h-3.5 mr-1.5" /> <span>Atualizado: {lastUpdate.toLocaleDateString('pt-BR')}</span>
-          </div>
+
+        {/* Unified Toolbar: Date Filter + Stats */}
+        <div className="bg-white px-4 py-3 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div className="flex items-center text-sle-primary bg-blue-50 px-3 py-1.5 rounded-full">
+              <Clock className="w-4 h-4 mr-2" />
+              <span className="font-semibold text-xs sm:text-sm uppercase tracking-tight">Atualizado: {lastUpdate.toLocaleDateString('pt-BR')}</span>
+            </div>
+            
+            <div className="flex items-center gap-3 w-full md:w-auto justify-center md:justify-end">
+                <div className="flex items-center space-x-2 bg-gray-50 px-3 py-2 rounded-lg border border-gray-100">
+                   <Calendar className="w-4 h-4 text-gray-400" />
+                   <input type="date" value={dateRange.start} onChange={(e) => onDateFilterChange(e.target.value, dateRange.end)} className="bg-transparent text-[11px] sm:text-xs outline-none w-26 font-semibold text-gray-600" />
+                   <span className="text-gray-300">-</span>
+                   <input type="date" value={dateRange.end} onChange={(e) => onDateFilterChange(dateRange.start, e.target.value)} className="bg-transparent text-[11px] sm:text-xs outline-none w-26 font-semibold text-gray-600" />
+                </div>
+                <div className="hidden sm:flex text-[10px] font-bold text-blue-800 bg-blue-100/50 px-3 py-2 rounded-lg border border-blue-200/50 uppercase tracking-widest leading-none">
+                   DIAS: {fixedDays.elapsed}/{fixedDays.total}
+                </div>
+            </div>
         </div>
       </div>
 
@@ -202,14 +222,7 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
 
         {/* BAIXAS CARD */}
         <Card title="BAIXAS" icon={<Truck className="w-5 h-5 text-warning opacity-60" />} className="border-l-warning shadow-sm hover:shadow-md transition-shadow">
-           <div className="space-y-4">
-              <div className="flex items-center justify-between gap-2 p-2 bg-gray-50 rounded-lg border border-gray-100">
-                  <span className="text-[9px] font-semibold text-gray-400 uppercase tracking-tight">Filtro Prazo:</span>
-                  <div className="flex items-center gap-1">
-                     <input type="date" value={deliveryFilter.start} onChange={(e) => setDeliveryFilter(p => ({...p, start: e.target.value}))} className="bg-white border border-gray-200 rounded text-[10px] px-1.5 py-1 focus:ring-1 focus:ring-sle-primary outline-none" />
-                     <input type="date" value={deliveryFilter.end} onChange={(e) => setDeliveryFilter(p => ({...p, end: e.target.value}))} className="bg-white border border-gray-200 rounded text-[10px] px-1.5 py-1 focus:ring-1 focus:ring-sle-primary outline-none" />
-                  </div>
-              </div>
+           <div className="flex flex-col gap-4 h-full justify-center">
               <div className="flex gap-2 h-[100px]">
                 <div 
                   onClick={() => filterAndSortByDate('baixas', 'noPrazo')}

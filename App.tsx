@@ -154,7 +154,17 @@ const App: React.FC = () => {
     }
     if (view === DashboardView.UNIT_DETAIL && data && selectedUnit) {
       const stats = calculateStats(data, selectedUnit, calculationDateRange);
-      return <UnitDashboard stats={stats[0]} user={user} onBack={() => setView(DashboardView.MANAGER)} setHeaderActions={setHeaderActions} lastUpdate={data.lastUpdate} allCtes={data.ctes} fixedDays={data.fixedDays} dateRange={dateRange} />;
+      return <UnitDashboard 
+        stats={stats[0]} 
+        user={user} 
+        onBack={() => setView(DashboardView.MANAGER)} 
+        setHeaderActions={setHeaderActions} 
+        lastUpdate={data.lastUpdate} 
+        allCtes={data.ctes} 
+        fixedDays={data.fixedDays} 
+        dateRange={dateRange} 
+        onDateFilterChange={(start, end) => setDateRange({ start, end })}
+      />;
     }
     return null;
   };

@@ -39,9 +39,6 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, allCtes, onS
   
   const [isExporting, setIsExporting] = useState<string | null>(null); // 'sales' | 'delivery' | 'manifest' | null
   
-  const defaultDeliveryEnd = lastUpdate.toISOString().split('T')[0];
-  const [deliveryFilter, setDeliveryFilter] = useState({ start: '', end: defaultDeliveryEnd });
-
   // --- PREPARAÇÃO DE DADOS ---
 
   const filteredStats = useMemo(() => {
@@ -65,8 +62,9 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, allCtes, onS
 
   const deliveryStats = useMemo(() => {
     let countNoPrazo = 0, countForaPrazo = 0, countSemBaixa = 0;
-    const start = deliveryFilter.start ? new Date(deliveryFilter.start + 'T00:00:00') : null;
-    const end = deliveryFilter.end ? new Date(deliveryFilter.end + 'T23:59:59') : null;
+    // Usa o dateRange global em vez de filtro local
+    const start = dateRange.start ? new Date(dateRange.start + 'T00:00:00') : null;
+    const end = dateRange.end ? new Date(dateRange.end + 'T23:59:59') : null;
 
     allCtes.forEach(cte => {
       if (!cte.prazoBaixa) return;
@@ -88,7 +86,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, allCtes, onS
       pctSemBaixa: total > 0 ? (countSemBaixa / total) * 100 : 0,
       pctForaPrazo: total > 0 ? (countForaPrazo / total) * 100 : 0,
     };
-  }, [allCtes, deliveryFilter]);
+  }, [allCtes, dateRange]);
 
   const generalPercentProj = totalStats.meta > 0 ? (totalStats.projecao / totalStats.meta) * 100 : 0;
   const generalPercentFat = totalStats.meta > 0 ? (totalStats.faturamento / totalStats.meta) * 100 : 0;
@@ -363,14 +361,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, allCtes, onS
 
         {/* PENDÊNCIAS CARD */}
         <Card title="PENDÊNCIAS DE ENTREGA" icon={<Truck className="w-5 h-5 text-warning opacity-50"/>} className="border-l-warning shadow-sm hover:shadow-md transition-shadow">
-           <div className="flex flex-col gap-4">
-             <div className="flex items-center justify-between gap-1 p-2 bg-gray-50 rounded-lg border border-gray-100">
-                <span className="text-[9px] font-semibold text-gray-400 uppercase tracking-tight leading-none">Filtrar Prazo:</span>
-                <div className="flex items-center gap-1">
-                   <input type="date" value={deliveryFilter.start} onChange={(e) => setDeliveryFilter(p => ({...p, start: e.target.value}))} className="bg-white border border-gray-200 rounded text-[10px] px-1.5 py-1 focus:ring-1 focus:ring-warning" />
-                   <input type="date" value={deliveryFilter.end} onChange={(e) => setDeliveryFilter(p => ({...p, end: e.target.value}))} className="bg-white border border-gray-200 rounded text-[10px] px-1.5 py-1 focus:ring-1 focus:ring-warning" />
-                </div>
-             </div>
+           <div className="flex flex-col gap-4 h-full justify-center">
              <div className="grid grid-cols-3 gap-2 items-center text-center h-[90px]">
                <div className="flex flex-col border-r border-gray-100 px-1 py-1">
                   <span className="text-xl font-bold text-green-700 leading-none">{deliveryStats.noPrazo}</span>
@@ -442,7 +433,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, allCtes, onS
                         <th className="w-[20%] px-2 py-3 text-right font-bold uppercase cursor-pointer hover:bg-blue-100 transition-colors" onClick={() => handleSalesSort('projecao')}>
                             <div className="flex items-center justify-end">PROJEÇÃO <SortIcon active={salesSort.field === 'projecao'} dir={salesSort.dir} /></div>
                         </th>
-                        <th className="w-[20%] px-2 py-3 text-center font-bold uppercase cursor-pointer hover:bg-blue-100 transition-colors" onClick={() => handleSalesSort('percentualProjecao')}>
+                        <th className="w-[20%] px-2 py-3 text-center font-bold uppercase cursor-pointer" onClick={() => handleSalesSort('percentualProjecao')}>
                             <div className="flex items-center justify-center">% PROJEÇÃO <SortIcon active={salesSort.field === 'percentualProjecao'} dir={salesSort.dir} /></div>
                         </th>
                     </tr>
