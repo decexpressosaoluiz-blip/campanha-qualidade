@@ -30,6 +30,10 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
   const [mdfeFilter, setMdfeFilter] = useState<'all' | 'comMdfe' | 'semMdfe'>('all');
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection }>({ key: 'data', direction: 'desc' });
 
+  // Filtro local para o card de BAIXAS (atua sobre Prazo Baixa)
+  const [deliveryStart, setDeliveryStart] = useState('');
+  const [deliveryEnd, setDeliveryEnd] = useState('');
+
   const getDocuments = (): Cte[] => {
     let docs: Cte[] = [];
     switch (activeTab) {
@@ -67,14 +71,18 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
 
   const unitDeliveryStats = useMemo(() => {
     let countNoPrazo = 0, countForaPrazo = 0, countSemBaixa = 0;
-    // Usa o dateRange global em vez de filtro local
-    const start = dateRange.start ? new Date(dateRange.start + 'T00:00:00') : null;
-    const end = dateRange.end ? new Date(dateRange.end + 'T23:59:59') : null;
+    
+    // Filtro local por Prazo de Baixa (Coluna F)
+    const start = deliveryStart ? new Date(deliveryStart + 'T00:00:00') : null;
+    const end = deliveryEnd ? new Date(deliveryEnd + 'T23:59:59') : null;
 
     allCtes.forEach(cte => {
       if (!cte.prazoBaixa || cte.unidadeEntrega !== stats.unidade) return;
+      
+      // Validação do filtro de data sobre o Prazo de Baixa
       if (start && cte.prazoBaixa < start) return;
       if (end && cte.prazoBaixa > end) return;
+
       const status = normalizeStatus(cte.statusPrazo);
       if (status === 'NO PRAZO') countNoPrazo++;
       else if (status === 'FORA DO PRAZO') countForaPrazo++;
@@ -91,7 +99,7 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
       pctSemBaixa: total > 0 ? (countSemBaixa / total) * 100 : 0,
       pctForaPrazo: total > 0 ? (countForaPrazo / total) * 100 : 0
     };
-  }, [allCtes, dateRange, stats.unidade]);
+  }, [allCtes, deliveryStart, deliveryEnd, stats.unidade]);
 
   // Cálculo da Meta do Dia da Unidade
   const remainingDays = Math.max(1, fixedDays.total - fixedDays.elapsed);
@@ -123,13 +131,9 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
   const chartStart = dateRange.start ? new Date(dateRange.start + 'T00:00:00') : undefined;
   const chartEnd = dateRange.end ? new Date(dateRange.end + 'T23:59:59') : undefined;
 
-  // Determine which date to show as "Vendas do dia" label
-  // Logic: Use Filter End Date OR Last Update Date. 
-  // If Filter End Date > Last Update Date, use Last Update Date to avoid showing future dates.
   const filterEndDate = dateRange.end ? new Date(dateRange.end + 'T12:00:00') : lastUpdate;
   const effectiveDate = filterEndDate > lastUpdate ? lastUpdate : filterEndDate;
   const salesLabelDate = new Date(effectiveDate);
-  // Removido -1 dia para coincidir com a lógica de cálculo atualizada
 
   return (
     <div className="space-y-6 animate-fade-in pb-10 px-0 sm:px-0">
@@ -182,7 +186,6 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
                  <span className="text-3xl font-bold text-[#0F103A] tracking-tight">{stats.faturamento.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</span>
                  <div className="text-[10px] font-semibold text-gray-400 mt-1 uppercase tracking-wider">Meta: {stats.meta.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</div>
                </div>
-               {/* Área da Meta do Dia conforme sinalizado */}
                <div className="bg-blue-50 border border-blue-100 rounded-lg p-2 text-right">
                   <p className="text-[9px] font-bold text-blue-800 uppercase leading-none mb-1">Meta do Dia</p>
                   <p className="text-sm font-bold text-sle-primary leading-none">
@@ -200,9 +203,7 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
                    <span className={`text-lg font-bold ${stats.percentualProjecao >= 100 ? 'text-green-600' : 'text-red-600'}`}>{stats.percentualProjecao.toFixed(1)}%</span>
                 </div>
                 <div className="relative w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                    {/* Barra de Projeção (Transparente) */}
                     <div className={`absolute top-0 left-0 h-full transition-all duration-500 opacity-40 ${stats.percentualProjecao >= 100 ? 'bg-green-600' : 'bg-red-600'}`} style={{ width: `${Math.min(stats.percentualProjecao, 100)}%` }}></div>
-                    {/* Barra de Faturamento Atual (Sólida) */}
                     <div className={`absolute top-0 left-0 h-full transition-all duration-500 ${stats.percentualProjecao >= 100 ? 'bg-green-600' : 'bg-red-600'}`} style={{ width: `${Math.min((stats.faturamento / stats.meta) * 100, 100)}%` }}></div>
                 </div>
              </div>
@@ -222,8 +223,18 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
 
         {/* BAIXAS CARD */}
         <Card title="BAIXAS" icon={<Truck className="w-5 h-5 text-warning opacity-60" />} className="border-l-warning shadow-sm hover:shadow-md transition-shadow">
-           <div className="flex flex-col gap-4 h-full justify-center">
-              <div className="flex gap-2 h-[100px]">
+           <div className="flex flex-col gap-4">
+              {/* Filtro de Prazo Local */}
+              <div className="bg-gray-50/80 p-2 rounded-lg border border-gray-100 flex flex-col items-center">
+                  <span className="text-[9px] font-bold text-gray-400 uppercase mb-2 tracking-widest">Filtrar Prazo (Col F):</span>
+                  <div className="flex items-center gap-1">
+                      <input type="date" value={deliveryStart} onChange={(e) => setDeliveryStart(e.target.value)} className="bg-white border border-gray-200 text-[10px] p-1 rounded outline-none focus:ring-1 focus:ring-warning w-24" />
+                      <span className="text-gray-300">-</span>
+                      <input type="date" value={deliveryEnd} onChange={(e) => setDeliveryEnd(e.target.value)} className="bg-white border border-gray-200 text-[10px] p-1 rounded outline-none focus:ring-1 focus:ring-warning w-24" />
+                  </div>
+              </div>
+
+              <div className="flex gap-2 h-[80px]">
                 <div 
                   onClick={() => filterAndSortByDate('baixas', 'noPrazo')}
                   className={`flex-1 flex flex-col items-center justify-center border rounded-lg transition-all cursor-pointer active:scale-95 ${baixaFilter === 'noPrazo' && activeTab === 'baixas' ? 'border-green-400 bg-green-100 ring-2 ring-green-100 shadow-inner' : 'border-green-100 bg-green-50/30 hover:bg-green-100/50 hover:shadow-sm'}`}
