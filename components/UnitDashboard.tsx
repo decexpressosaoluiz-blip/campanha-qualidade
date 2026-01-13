@@ -129,7 +129,7 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
   const filterEndDate = dateRange.end ? new Date(dateRange.end + 'T12:00:00') : lastUpdate;
   const effectiveDate = filterEndDate > lastUpdate ? lastUpdate : filterEndDate;
   const salesLabelDate = new Date(effectiveDate);
-  salesLabelDate.setDate(salesLabelDate.getDate() - 1);
+  // Removido -1 dia para coincidir com a lógica de cálculo atualizada
 
   return (
     <div className="space-y-6 animate-fade-in pb-10 px-0 sm:px-0">

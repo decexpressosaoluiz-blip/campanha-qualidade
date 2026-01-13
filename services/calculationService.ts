@@ -106,14 +106,13 @@ export const calculateStats = (
     }
   }
 
-  // A regra de negócio exige que as vendas do dia sejam D-1 da data de referência.
+  // Define o dia alvo como a data de referência (última atualização ou fim do filtro).
   const targetSalesDate = new Date(baseReferenceDate);
-  targetSalesDate.setDate(targetSalesDate.getDate() - 1);
   const targetDateStr = targetSalesDate.toISOString().split('T')[0];
 
   // Process CTEs
   data.ctes.forEach(cte => {
-    // Cálculo do faturamento do dia alvo (Data Referência - 1 dia)
+    // Cálculo do faturamento do dia alvo (Data Referência)
     const cteDateStr = cte.data.toISOString().split('T')[0];
     const isTargetDay = cteDateStr === targetDateStr;
 
