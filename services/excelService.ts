@@ -1,3 +1,4 @@
+
 import { Cte } from '../types';
 
 export const downloadXLS = (data: Cte[], filename: string) => {
@@ -15,6 +16,7 @@ export const downloadXLS = (data: Cte[], filename: string) => {
   table += '<th>Valor</th>';
   table += '<th>Status Prazo</th>';
   table += '<th>Status MDFE</th>';
+  table += '<th>Status Foto (Coluna M)</th>';
   table += '<th>Remetente</th>';
   table += '<th>Destinatário</th>';
   table += '</tr></thead>';
@@ -30,6 +32,7 @@ export const downloadXLS = (data: Cte[], filename: string) => {
     table += `<td>${cte.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>`;
     table += `<td>${cte.statusPrazo}</td>`;
     table += `<td>${cte.statusMdfe}</td>`;
+    table += `<td>${cte.statusEntrega}</td>`;
     table += `<td>${cte.remetente || ''}</td>`;
     table += `<td>${cte.destinatario || ''}</td>`;
     table += '</tr>';

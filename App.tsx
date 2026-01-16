@@ -73,6 +73,7 @@ const App: React.FC = () => {
           unidadeEntrega: normalizeUnitName(row[8]),
           statusMdfe: row[10],
           valor: parseCurrency(row[11]),
+          statusEntrega: row[12] || '', // Coluna M
           remetente: row[3],
           destinatario: row[4]
         };
@@ -141,8 +142,6 @@ const App: React.FC = () => {
     );
     if (view === DashboardView.LOGIN) return <Login onLogin={handleLogin} loading={loading} error={loginError} />;
     
-    // Configuração robusta de datas para cálculo
-    // Força o horário 12:00:00 para evitar problemas de fuso horário ao converter string YYYY-MM-DD para Date
     const calculationDateRange = {
       start: dateRange.start ? new Date(dateRange.start + 'T12:00:00') : null,
       end: dateRange.end ? new Date(dateRange.end + 'T12:00:00') : null

@@ -13,6 +13,7 @@ export interface Cte {
   valor: number;
   statusPrazo: string;
   statusMdfe: string;
+  statusEntrega: string; // Coluna M
   remetente?: string;
   destinatario?: string;
 }
@@ -51,12 +52,18 @@ export interface UnitStats {
   comMdfe: number;
   semMdfe: number;
 
+  // Novo Status Entrega (Coluna M)
+  comFoto: number;
+  semFoto: number;
+  semBaixaEntrega: number;
+
   // Document Lists (for drill down)
   docsVendas: Cte[];
   docsBaixaNoPrazo: Cte[];
   docsBaixaForaPrazo: Cte[];
   docsSemBaixa: Cte[];
   docsSemMdfe: Cte[];
+  docsSemFoto: Cte[];
 }
 
 export enum DashboardView {
@@ -65,4 +72,4 @@ export enum DashboardView {
   UNIT_DETAIL
 }
 
-export type SortField = 'unidade' | 'faturamento' | 'projecao' | 'noPrazo' | 'foraPrazo' | 'semBaixa' | 'semMdfe';
+export type SortField = 'unidade' | 'faturamento' | 'projecao' | 'noPrazo' | 'foraPrazo' | 'semBaixa' | 'semMdfe' | 'semFoto';

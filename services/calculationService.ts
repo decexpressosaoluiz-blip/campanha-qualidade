@@ -23,33 +23,21 @@ export const parseCurrency = (value: string): number => {
   return isNaN(num) ? 0 : num;
 };
 
-// Robust Date Parser
 export const parseDate = (value: string): Date | null => {
   if (!value) return null;
   const cleanValue = value.trim();
-  
-  // Try YYYY-MM-DD (ISO)
   if (cleanValue.match(/^\d{4}-\d{2}-\d{2}$/)) {
     const [year, month, day] = cleanValue.split('-').map(Number);
-    // Force 12:00:00 to avoid timezone rollovers
     return new Date(year, month - 1, day, 12, 0, 0);
   }
-
-  // Try DD/MM/YYYY or D/M/YYYY
   const parts = cleanValue.split(/[\/\.\-]/);
   if (parts.length === 3) {
     const p0 = parseInt(parts[0]);
     const p1 = parseInt(parts[1]);
     const p2 = parseInt(parts[2]);
-
-    // Check if first part is year (YYYY/MM/DD)
-    if (parts[0].length === 4) {
-       return new Date(p0, p1 - 1, p2, 12, 0, 0);
-    }
-    // Assume DD/MM/YYYY
+    if (parts[0].length === 4) return new Date(p0, p1 - 1, p2, 12, 0, 0);
     return new Date(p2, p1 - 1, p0, 12, 0, 0);
   }
-  
   const d = new Date(value);
   if (!isNaN(d.getTime())) {
     d.setHours(12, 0, 0, 0);
@@ -65,113 +53,91 @@ export const calculateStats = (
 ): UnitStats[] => {
   const unitMap = new Map<string, UnitStats>();
 
-  // Init Map
-  data.metas.forEach(m => {
-    unitMap.set(m.unidade, {
-      unidade: m.unidade,
-      faturamento: 0,
-      vendasDiaAnterior: 0,
-      recebido: 0,
-      meta: m.meta,
-      projecao: 0,
-      percentualProjecao: 0,
-      totalCtes: 0,
-      baixaNoPrazo: 0,
-      baixaForaPrazo: 0,
-      semBaixa: 0,
-      comMdfe: 0,
-      semMdfe: 0,
-      docsVendas: [],
-      docsBaixaNoPrazo: [],
-      docsBaixaForaPrazo: [],
-      docsSemBaixa: [],
-      docsSemMdfe: []
-    });
-  });
+  const getOrCreateStats = (unit: string): UnitStats => {
+    if (!unitMap.has(unit)) {
+      unitMap.set(unit, {
+        unidade: unit, faturamento: 0, vendasDiaAnterior: 0, recebido: 0, meta: 0, 
+        projecao: 0, percentualProjecao: 0, totalCtes: 0, baixaNoPrazo: 0, baixaForaPrazo: 0,
+        semBaixa: 0, comMdfe: 0, semMdfe: 0, comFoto: 0, semFoto: 0, semBaixaEntrega: 0,
+        docsVendas: [], docsBaixaNoPrazo: [], docsBaixaForaPrazo: [], docsSemBaixa: [],
+        docsSemMdfe: [], docsSemFoto: []
+      });
+    }
+    return unitMap.get(unit)!;
+  };
+
+  data.metas.forEach(m => { getOrCreateStats(m.unidade).meta = m.meta; });
 
   const hasDateFilter = dateRange?.start && dateRange?.end;
-  const filterStart = dateRange?.start ? new Date(dateRange.start.getFullYear(), dateRange.start.getMonth(), dateRange.start.getDate(), 0,0,0) : null;
-  const filterEnd = dateRange?.end ? new Date(dateRange.end.getFullYear(), dateRange.end.getMonth(), dateRange.end.getDate(), 23,59,59) : null;
+  const filterStart = dateRange?.start ? new Date(dateRange.start.setHours(0,0,0,0)) : null;
+  const filterEnd = dateRange?.end ? new Date(dateRange.end.setHours(23,59,59,999)) : null;
 
-  // Define a data base de referência.
-  // Se houver filtro de data, usa a data final do filtro.
-  // IMPORTANTE: Se a data final do filtro for FUTURA em relação à última atualização, 
-  // limitamos à última atualização para não mostrar vendas de um dia que não existe (futuro).
-  let baseReferenceDate = data.lastUpdate;
-  if (dateRange?.end) {
-    if (dateRange.end > data.lastUpdate) {
-      baseReferenceDate = data.lastUpdate;
-    } else {
-      baseReferenceDate = dateRange.end;
-    }
-  }
+  // Define a data alvo para "Vendas do Dia" (último dia do período ou última atualização)
+  const targetDateStr = (filterEnd || data.lastUpdate).toISOString().split('T')[0];
 
-  // Define o dia alvo como a data de referência (última atualização ou fim do filtro).
-  const targetSalesDate = new Date(baseReferenceDate);
-  const targetDateStr = targetSalesDate.toISOString().split('T')[0];
-
-  // Process CTEs
   data.ctes.forEach(cte => {
-    // Cálculo do faturamento do dia alvo (Data Referência)
-    const cteDateStr = cte.data.toISOString().split('T')[0];
-    const isTargetDay = cteDateStr === targetDateStr;
-
-    // Aplica o filtro global de período nas contagens gerais
     if (hasDateFilter && filterStart && filterEnd) {
       if (cte.data < filterStart || cte.data > filterEnd) return; 
     }
 
     const unitColeta = normalizeUnitName(cte.unidadeColeta);
-    if (unitColeta && unitMap.has(unitColeta)) {
-      const stats = unitMap.get(unitColeta)!;
+    const unitEntrega = normalizeUnitName(cte.unidadeEntrega);
+    
+    // Todos os documentos contribuem para o pool de cálculos se tiverem unidade
+    const unitRef = unitColeta || unitEntrega;
+    if (!unitRef) return;
+
+    const stats = getOrCreateStats(unitRef);
+    const statusMdfe = normalizeStatus(cte.statusMdfe);
+    const statusPrazo = normalizeStatus(cte.statusPrazo);
+    const statusEntrega = normalizeStatus(cte.statusEntrega);
+
+    // 1. Lógica de Faturamento e MDFE
+    if (unitColeta) {
       stats.faturamento += cte.valor;
       stats.docsVendas.push(cte);
-      
-      if (isTargetDay) {
+      if (cte.data.toISOString().split('T')[0] === targetDateStr) {
         stats.vendasDiaAnterior += cte.valor;
       }
-
-      const statusMdfe = normalizeStatus(cte.statusMdfe);
-      if (statusMdfe.includes('COM MDFE') || statusMdfe.includes('ENCERRADO') || statusMdfe.includes('AUTORIZADO')) {
-        stats.comMdfe++;
-      } else {
-        stats.semMdfe++;
-        stats.docsSemMdfe.push(cte);
-      }
+      if (statusMdfe.match(/COM MDFE|ENCERRADO|AUTORIZADO/i)) stats.comMdfe++;
+      else { stats.semMdfe++; stats.docsSemMdfe.push(cte); }
     }
 
-    const unitEntrega = normalizeUnitName(cte.unidadeEntrega);
-    if (unitEntrega && unitMap.has(unitEntrega)) {
-      const stats = unitMap.get(unitEntrega)!;
-      // Incrementa Recebido baseado na entrega (Coluna I)
+    // 2. Lógica de Entrega e Foto (Unificando critérios para evitar 705 vs 706)
+    if (unitEntrega) {
       stats.recebido += cte.valor;
+      const isSemBaixa = statusPrazo === '' || statusPrazo === 'SEM DATA' || statusEntrega === 'SEM BAIXA' || statusEntrega.includes('NÃO BAIXADO');
 
-      const statusPrazo = normalizeStatus(cte.statusPrazo);
-      if (statusPrazo === 'NO PRAZO') {
-        stats.baixaNoPrazo++;
-        stats.docsBaixaNoPrazo.push(cte);
-      } else if (statusPrazo === 'FORA DO PRAZO') {
-        stats.baixaForaPrazo++;
-        stats.docsBaixaForaPrazo.push(cte);
-      } else {
+      if (isSemBaixa) {
         stats.semBaixa++;
+        stats.semBaixaEntrega++;
         stats.docsSemBaixa.push(cte);
+      } else {
+        if (statusPrazo === 'NO PRAZO') {
+          stats.baixaNoPrazo++;
+          stats.docsBaixaNoPrazo.push(cte);
+        } else {
+          stats.baixaForaPrazo++;
+          stats.docsBaixaForaPrazo.push(cte);
+        }
+
+        if (statusEntrega === 'COM FOTO') stats.comFoto++;
+        else {
+          stats.semFoto++;
+          stats.docsSemFoto.push(cte);
+        }
       }
     }
   });
 
-  const daysElapsed = data.fixedDays.elapsed > 0 ? data.fixedDays.elapsed : 1;
-  const totalDaysInPeriod = data.fixedDays.total > 0 ? data.fixedDays.total : 1;
+  const daysElapsed = Math.max(1, data.fixedDays.elapsed);
+  const totalDaysInPeriod = Math.max(1, data.fixedDays.total);
 
-  Array.from(unitMap.values()).forEach(stats => {
-    const dailyAvg = stats.faturamento / daysElapsed;
-    stats.projecao = dailyAvg * totalDaysInPeriod;
+  unitMap.forEach(stats => {
+    stats.projecao = (stats.faturamento / daysElapsed) * totalDaysInPeriod;
     stats.percentualProjecao = stats.meta > 0 ? (stats.projecao / stats.meta) * 100 : 0;
   });
 
-  const allStats = Array.from(unitMap.values());
-  if (specificUnit) {
-    return allStats.filter(s => s.unidade === normalizeUnitName(specificUnit));
-  }
-  return allStats;
+  const results = Array.from(unitMap.values());
+  return specificUnit ? results.filter(s => s.unidade === normalizeUnitName(specificUnit)) : results;
 };
