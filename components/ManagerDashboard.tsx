@@ -112,7 +112,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, summary, all
     onSelectUnit(unit);
   };
 
-  const exportElement = async (ref: React.RefObject<HTMLDivElement>, fileName: string) => {
+  const exportElement = async (ref: React.RefObject<HTMLDivElement | null>, fileName: string) => {
     if (!ref.current) return;
     try {
       const dataUrl = await toPng(ref.current, { backgroundColor: '#ffffff', quality: 1 });
