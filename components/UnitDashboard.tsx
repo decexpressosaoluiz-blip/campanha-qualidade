@@ -33,11 +33,16 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
 
   const [deliveryStart, setDeliveryStart] = useState('');
   const [deliveryEnd, setDeliveryEnd] = useState('');
+  
+  const [photoStart, setPhotoStart] = useState('');
+  const [photoEnd, setPhotoEnd] = useState('');
 
   const getDocuments = (): Cte[] => {
     let docs: Cte[] = [];
     switch (activeTab) {
-      case 'vendas': docs = [...stats.docsVendas]; break;
+      case 'vendas': 
+        docs = [...stats.docsVendas]; 
+        break;
       case 'baixas':
         if (baixaFilter === 'all') docs = [...stats.docsSemBaixa, ...stats.docsBaixaForaPrazo, ...stats.docsBaixaNoPrazo];
         else if (baixaFilter === 'noPrazo') docs = [...stats.docsBaixaNoPrazo];
@@ -50,13 +55,10 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
         else if (mdfeFilter === 'semMdfe') docs = [...stats.docsSemMdfe];
         break;
       case 'fotos':
-        if (fotoFilter === 'all') docs = [...stats.docsVendas];
-        else if (fotoFilter === 'comFoto') docs = stats.docsVendas.filter(d => normalizeStatus(d.statusEntrega) === 'COM FOTO');
+        if (fotoFilter === 'all') docs = [...stats.docsComFoto, ...stats.docsSemFoto, ...stats.docsSemBaixaEntrega];
+        else if (fotoFilter === 'comFoto') docs = [...stats.docsComFoto];
         else if (fotoFilter === 'semFoto') docs = [...stats.docsSemFoto];
-        else if (fotoFilter === 'semBaixaEntrega') docs = stats.docsVendas.filter(d => {
-            const s = normalizeStatus(d.statusEntrega);
-            return s === 'SEM BAIXA' || s.includes('NÃO BAIXADO');
-        });
+        else if (fotoFilter === 'semBaixaEntrega') docs = [...stats.docsSemBaixaEntrega];
         break;
     }
     return docs.sort((a, b) => {
@@ -77,13 +79,20 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
     const end = deliveryEnd ? new Date(deliveryEnd + 'T23:59:59') : null;
 
     allCtes.forEach(cte => {
-      if (!cte.prazoBaixa || cte.unidadeEntrega !== stats.unidade) return;
+      // FILTRAGEM PELA UNIDADE DE DESTINO (COLUNA I)
+      if (cte.unidadeEntrega !== stats.unidade) return;
+      
+      if (!cte.prazoBaixa) return;
       if (start && cte.prazoBaixa < start) return;
       if (end && cte.prazoBaixa > end) return;
+      
       const status = normalizeStatus(cte.statusPrazo);
-      if (status === 'NO PRAZO') countNoPrazo++;
-      else if (status === 'FORA DO PRAZO') countForaPrazo++;
-      else countSemBaixa++;
+      const statusEntrega = normalizeStatus(cte.statusEntrega);
+      const isSemBaixa = status === '' || status === 'SEM DATA' || statusEntrega === 'SEM BAIXA' || statusEntrega.includes('NÃO BAIXADO');
+
+      if (isSemBaixa) countSemBaixa++;
+      else if (status === 'NO PRAZO') countNoPrazo++;
+      else countForaPrazo++;
     });
 
     const total = countNoPrazo + countForaPrazo + countSemBaixa;
@@ -95,8 +104,38 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
     };
   }, [allCtes, deliveryStart, deliveryEnd, stats.unidade]);
 
-  const remainingDays = Math.max(1, fixedDays.total - fixedDays.elapsed);
-  const metaDoDiaUnit = Math.max(0, stats.meta - stats.faturamento) / remainingDays;
+  const unitPhotoStats = useMemo(() => {
+    let com = 0, sem = 0;
+    const start = photoStart ? new Date(photoStart + 'T00:00:00') : null;
+    const end = photoEnd ? new Date(photoEnd + 'T23:59:59') : null;
+
+    if (photoStart || photoEnd) {
+      allCtes.forEach(cte => {
+        // FILTRAGEM PELA UNIDADE DE DESTINO (COLUNA I)
+        if (cte.unidadeEntrega !== stats.unidade) return;
+        
+        // FILTRAGEM PELA DATA DE BAIXA (COLUNA D)
+        if (!cte.dataBaixa) return;
+        
+        if (start && cte.dataBaixa < start) return;
+        if (end && cte.dataBaixa > end) return;
+
+        const statusEntrega = normalizeStatus(cte.statusEntrega);
+        if (statusEntrega.includes('COM FOTO')) com++;
+        else if (statusEntrega.includes('SEM FOTO')) sem++;
+      });
+      const total = com + sem;
+      return { com, sem, pctCom: total > 0 ? (com / total) * 100 : 0, pctSem: total > 0 ? (sem / total) * 100 : 0 };
+    }
+    
+    const totalBase = stats.comFoto + stats.semFoto;
+    return { 
+      com: stats.comFoto, 
+      sem: stats.semFoto, 
+      pctCom: totalBase > 0 ? (stats.comFoto / totalBase) * 100 : 0,
+      pctSem: totalBase > 0 ? (stats.semFoto / totalBase) * 100 : 0
+    };
+  }, [allCtes, photoStart, photoEnd, stats.unidade, stats.comFoto, stats.semFoto]);
 
   const handleSort = (key: SortKey) => setSortConfig(p => ({ key, direction: p.key === key && p.direction === 'asc' ? 'desc' : 'asc' }));
 
@@ -106,10 +145,6 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
     if (tab === 'manifestos') setMdfeFilter(filterType);
     if (tab === 'fotos') setFotoFilter(filterType);
     setSortConfig({ key: 'data', direction: 'asc' });
-    const tableElement = document.getElementById('listagem-documentos');
-    if (tableElement) {
-      window.scrollTo({ top: tableElement.getBoundingClientRect().top + window.pageYOffset - 100, behavior: 'smooth' });
-    }
   };
 
   const SortIcon = ({ column }: { column: SortKey }) => {
@@ -117,22 +152,17 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
     return sortConfig.direction === 'asc' ? <ArrowUp className="w-2.5 h-2.5 ml-0.5 text-sle-primary" /> : <ArrowDown className="w-2.5 h-2.5 ml-0.5 text-sle-primary" />;
   };
 
+  const remainingDays = Math.max(1, fixedDays.total - fixedDays.elapsed);
+  const metaDoDiaUnit = Math.max(0, stats.meta - stats.faturamento) / remainingDays;
   const filterEndDate = dateRange.end ? new Date(dateRange.end + 'T12:00:00') : lastUpdate;
   const effectiveDate = filterEndDate > lastUpdate ? lastUpdate : filterEndDate;
   const salesLabelDate = new Date(effectiveDate);
-
-  const totalStatusEntrega = stats.comFoto + stats.semFoto + stats.semBaixaEntrega;
-  const pctComFoto = totalStatusEntrega > 0 ? (stats.comFoto / totalStatusEntrega) * 100 : 0;
-  const pctSemFoto = totalStatusEntrega > 0 ? (stats.semFoto / totalStatusEntrega) * 100 : 0;
-  const pctSemBaixaEntrega = totalStatusEntrega > 0 ? (stats.semBaixaEntrega / totalStatusEntrega) * 100 : 0;
 
   const chartStart = dateRange.start ? new Date(dateRange.start + 'T00:00:00') : undefined;
   const chartEnd = dateRange.end ? new Date(dateRange.end + 'T23:59:59') : undefined;
 
   return (
     <div className="space-y-6 animate-fade-in pb-10">
-      
-      {/* HEADER SECTION */}
       <div className="flex flex-col gap-4 px-2 sm:px-0 mb-4">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-gray-200 pb-4">
              <div>
@@ -162,9 +192,6 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
                    <span className="text-gray-300">-</span>
                    <input type="date" value={dateRange.end} onChange={(e) => onDateFilterChange(dateRange.start, e.target.value)} className="bg-transparent text-[11px] sm:text-xs outline-none w-26 font-bold text-gray-600" />
                 </div>
-                <div className="hidden sm:flex text-[10px] font-bold text-blue-800 bg-blue-100/50 px-4 py-2 rounded-xl border border-blue-200/50 uppercase tracking-widest">
-                   DIAS: {fixedDays.elapsed}/{fixedDays.total}
-                </div>
             </div>
         </div>
       </div>
@@ -173,7 +200,7 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
         <Card title="PENDÊNCIAS DE ENTREGA" icon={<Truck className="w-5 h-5 text-warning opacity-40" />} className="border-l-warning">
            <div className="flex flex-col gap-4">
               <div className="bg-gray-50/50 p-2 rounded-xl border border-gray-100 flex flex-col items-center">
-                  <span className="text-[9px] font-bold text-gray-400 uppercase mb-2 tracking-widest leading-none">Filtrar Prazo:</span>
+                  <span className="text-[9px] font-bold text-gray-400 uppercase mb-2 tracking-widest leading-none">Filtrar Prazo (F):</span>
                   <div className="flex items-center gap-1">
                       <input type="date" value={deliveryStart} onChange={(e) => setDeliveryStart(e.target.value)} className="bg-white border border-gray-200 text-[10px] p-1.5 rounded-lg outline-none w-26 font-bold shadow-sm" />
                       <span className="text-gray-300">-</span>
@@ -200,19 +227,23 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
 
         <Card title="STATUS ENTREGA (FOTO)" icon={<Camera className="w-5 h-5 text-green-600 opacity-40" />} className="border-l-green-600">
            <div className="flex flex-col gap-4">
-              <div className="grid grid-cols-3 gap-3 h-[85px] items-center text-center pt-8">
+              <div className="bg-gray-50/50 p-2 rounded-xl border border-gray-100 flex flex-col items-center">
+                  <span className="text-[9px] font-bold text-gray-400 uppercase mb-2 tracking-widest leading-none">Filtrar Baixa (D):</span>
+                  <div className="flex items-center gap-1">
+                      <input type="date" value={photoStart} onChange={(e) => setPhotoStart(e.target.value)} className="bg-white border border-gray-200 text-[10px] p-1.5 rounded-lg outline-none w-26 font-bold shadow-sm" />
+                      <span className="text-gray-300">-</span>
+                      <input type="date" value={photoEnd} onChange={(e) => setPhotoEnd(e.target.value)} className="bg-white border border-gray-200 text-[10px] p-1.5 rounded-lg outline-none w-26 font-bold shadow-sm" />
+                  </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3 h-[85px] items-center text-center">
                  <div onClick={() => filterAndSortByDate('fotos', 'comFoto')} className={`flex flex-col items-center justify-center border rounded-xl transition-all cursor-pointer h-full ${fotoFilter === 'comFoto' ? 'border-green-400 bg-green-50 shadow-inner' : 'border-green-100 bg-green-50/20'}`}>
-                    <span className="text-2xl font-semibold text-green-700 leading-none">{stats.comFoto}</span>
-                    <span className="text-[9px] font-bold text-green-600 uppercase mt-2">{pctComFoto.toFixed(0)}% OK</span>
+                    <span className="text-2xl font-semibold text-green-700 leading-none">{unitPhotoStats.com}</span>
+                    <span className="text-[9px] font-bold text-green-600 uppercase mt-2">{unitPhotoStats.pctCom.toFixed(0)}% OK</span>
                  </div>
                  <div onClick={() => filterAndSortByDate('fotos', 'semFoto')} className={`flex-1 flex flex-col items-center justify-center border rounded-xl transition-all cursor-pointer h-full z-20 ${fotoFilter === 'semFoto' ? 'border-red-400 bg-red-50 shadow-md scale-105 ring-2 ring-red-100' : 'border-red-200 bg-red-50/40'}`}>
                     <CameraOff className="w-3.5 h-3.5 text-red-600 mb-1 opacity-70" />
-                    <span className="text-2xl font-semibold text-red-700 leading-none">{stats.semFoto}</span>
-                    <span className="text-[9px] font-bold text-red-600 uppercase mt-1.5 tracking-tighter">{pctSemFoto.toFixed(0)}% S/ FOTO</span>
-                 </div>
-                 <div onClick={() => filterAndSortByDate('fotos', 'semBaixaEntrega')} className={`flex flex-col items-center justify-center border rounded-xl transition-all cursor-pointer h-full ${fotoFilter === 'semBaixaEntrega' ? 'border-yellow-400 bg-yellow-50 shadow-inner' : 'border-yellow-100 bg-yellow-50/20'}`}>
-                    <span className="text-2xl font-semibold text-yellow-700 leading-none">{stats.semBaixaEntrega}</span>
-                    <span className="text-[9px] font-bold text-yellow-600 uppercase mt-2">PND BXA</span>
+                    <span className="text-2xl font-semibold text-red-700 leading-none">{unitPhotoStats.sem}</span>
+                    <span className="text-[9px] font-bold text-red-600 uppercase mt-1.5 tracking-tighter">{unitPhotoStats.pctSem.toFixed(0)}% S/ FOTO</span>
                  </div>
               </div>
               <div className="text-[9px] text-gray-400 font-bold uppercase tracking-widest text-center mt-2 opacity-60 leading-none">Comprovantes Digitais</div>
@@ -239,7 +270,6 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
         </Card>
       </div>
 
-      {/* REVENUE SECTION */}
       <div className="space-y-4 px-2 sm:px-0">
         <Card title="FATURAMENTO UNIDADE" icon={<DollarSign className="w-5 h-5 text-sle-primary opacity-40" />} className="border-l-sle-primary">
           <div className="flex flex-col md:flex-row items-center gap-10 py-3">
@@ -271,7 +301,6 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
                     <span className="text-[10px] font-bold text-blue-800 uppercase tracking-tighter leading-none">Vendas dia {salesLabelDate.toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'})}</span>
                     <span className="text-2xl font-semibold text-[#2E31B4] leading-none">{stats.vendasDiaAnterior.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</span>
                 </div>
-                {/* BALÃO LARANJA DE RECEBIDO RESTAURADO NA UNIDADE */}
                 <div className="bg-orange-50/80 border border-orange-200/40 rounded-2xl p-4 flex justify-between items-center shadow-sm">
                     <span className="text-[10px] font-bold text-orange-800 uppercase tracking-tighter leading-none">Recebido</span>
                     <span className="text-2xl font-semibold text-orange-700 leading-none">{stats.recebido.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</span>
@@ -287,7 +316,6 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
         <DailyRevenueChart ctes={allCtes} unitName={stats.unidade} startDate={chartStart} endDate={chartEnd} />
       </div>
 
-      {/* DOCUMENT LIST */}
       <div id="listagem-documentos" className="bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-100 mt-8 mx-2 sm:mx-0">
         <div className="px-8 py-6 bg-[#F8F9FE] border-b border-gray-100 flex flex-col sm:flex-row justify-between items-center gap-5">
           <div className="flex items-center">
@@ -307,7 +335,7 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
                   setActiveTab(t.key as TabType);
                   if (t.key === 'baixas') setBaixaFilter('all');
                   if (t.key === 'manifestos') setMdfeFilter('all');
-                  if (t.key === 'fotos') setFotoFilter('semFoto');
+                  if (t.key === 'fotos') setFotoFilter('all');
                   setSortConfig({ key: 'data', direction: 'desc' });
                 }} 
                 className={`px-5 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${activeTab === t.key ? 'bg-sle-primary text-white shadow-lg shadow-blue-900/20' : 'text-gray-500 hover:bg-white/90'}`}

@@ -7,13 +7,14 @@ export interface User {
 export interface Cte {
   id: string; // Chave/Número
   data: Date;
-  prazoBaixa: Date | null; // Coluna F
+  prazoBaixa: Date | null; // Coluna F (Prazo/Meta)
+  dataBaixa: Date | null; // Coluna J (Data Real da Baixa)
   unidadeColeta: string;
   unidadeEntrega: string;
   valor: number;
   statusPrazo: string;
   statusMdfe: string;
-  statusEntrega: string; // Coluna M
+  statusEntrega: string; // Coluna M (Status Foto)
   remetente?: string;
   destinatario?: string;
 }
@@ -64,6 +65,8 @@ export interface UnitStats {
   docsSemBaixa: Cte[];
   docsSemMdfe: Cte[];
   docsSemFoto: Cte[];
+  docsComFoto: Cte[];
+  docsSemBaixaEntrega: Cte[];
 }
 
 export enum DashboardView {

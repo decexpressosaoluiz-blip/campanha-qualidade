@@ -60,23 +60,23 @@ const App: React.FC = () => {
         if(dateVal > maxDateFound) maxDateFound = dateVal;
 
         return {
-          id: row[0],
-          data: dateVal,
-          prazoBaixa: parseDate(row[5]), // Coluna F
-          statusPrazo: row[6],
-          unidadeColeta: normalizeUnitName(row[7]),
-          unidadeEntrega: normalizeUnitName(row[8]),
-          statusMdfe: row[10],
-          valor: parseCurrency(row[11]),
-          statusEntrega: row[12] || '', // Coluna M
-          remetente: row[3],
-          destinatario: row[4]
+          id: row[0], // Col A
+          data: dateVal, // Col C
+          dataBaixa: parseDate(row[3]), // CORREÇÃO: Coluna D (índice 3) agora é Data Baixa
+          prazoBaixa: parseDate(row[5]), // Col F
+          statusPrazo: row[6], // Col G
+          unidadeColeta: normalizeUnitName(row[7]), // Col H
+          unidadeEntrega: normalizeUnitName(row[8]), // Col I (Destino)
+          statusMdfe: row[10], // Col K
+          valor: parseCurrency(row[11]), // Col L
+          statusEntrega: row[12] || '', // Col M (Status Foto)
+          remetente: row[3], // Reservado
+          destinatario: row[4] // Col E
         };
       }).filter((c): c is NonNullable<typeof c> => c !== null);
 
       const lastUpdate = maxDateFound.getTime() > 0 ? maxDateFound : new Date();
       
-      // Ajuste de filtros iniciais
       const startOfCurrentMonth = new Date(lastUpdate.getFullYear(), lastUpdate.getMonth(), 1);
       const startDateStr = startOfCurrentMonth.toISOString().split('T')[0];
       const endDateStr = lastUpdate.toISOString().split('T')[0];
@@ -92,6 +92,7 @@ const App: React.FC = () => {
         fixedDays: { total: fixedTotalDays || 21, elapsed: fixedElapsedDays || 1 }
       });
     } catch (err) {
+      console.error(err);
       setError('Falha ao carregar dados operacionais.');
     } finally {
       setLoading(false);

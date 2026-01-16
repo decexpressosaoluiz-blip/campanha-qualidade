@@ -24,21 +24,34 @@ export const parseCurrency = (value: string): number => {
 };
 
 export const parseDate = (value: string): Date | null => {
-  if (!value) return null;
+  if (!value || value.trim() === '' || value.toLowerCase() === 'null') return null;
   const cleanValue = value.trim();
-  if (cleanValue.match(/^\d{4}-\d{2}-\d{2}$/)) {
-    const [year, month, day] = cleanValue.split('-').map(Number);
+  
+  // Extrai apenas a data se houver hora (ex: "14/01/2026 08:30")
+  const datePart = cleanValue.split(' ')[0];
+  
+  // Tenta formato YYYY-MM-DD
+  if (datePart.match(/^\d{4}-\d{2}-\d{2}$/)) {
+    const [year, month, day] = datePart.split('-').map(Number);
     return new Date(year, month - 1, day, 12, 0, 0);
   }
-  const parts = cleanValue.split(/[\/\.\-]/);
+  
+  // Tenta formatos com barra ou ponto (DD/MM/YYYY)
+  const parts = datePart.split(/[\/\.\-]/);
   if (parts.length === 3) {
     const p0 = parseInt(parts[0]);
     const p1 = parseInt(parts[1]);
     const p2 = parseInt(parts[2]);
-    if (parts[0].length === 4) return new Date(p0, p1 - 1, p2, 12, 0, 0);
+    
+    // Se o primeiro part tiver 4 dígitos, assume YYYY-MM-DD
+    if (parts[0].length === 4) {
+      return new Date(p0, p1 - 1, p2, 12, 0, 0);
+    }
+    // Caso contrário assume DD-MM-YYYY
     return new Date(p2, p1 - 1, p0, 12, 0, 0);
   }
-  const d = new Date(value);
+  
+  const d = new Date(cleanValue);
   if (!isNaN(d.getTime())) {
     d.setHours(12, 0, 0, 0);
     return d;
@@ -46,7 +59,6 @@ export const parseDate = (value: string): Date | null => {
   return null;
 };
 
-// Auxiliar para comparação de datas sem fuso horário
 const toYMD = (date: Date) => {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -96,7 +108,7 @@ export const calculateStats = (
         projecao: 0, percentualProjecao: 0, totalCtes: 0, baixaNoPrazo: 0, baixaForaPrazo: 0,
         semBaixa: 0, comMdfe: 0, semMdfe: 0, comFoto: 0, semFoto: 0, semBaixaEntrega: 0,
         docsVendas: [], docsBaixaNoPrazo: [], docsBaixaForaPrazo: [], docsSemBaixa: [],
-        docsSemMdfe: [], docsSemFoto: []
+        docsSemMdfe: [], docsSemFoto: [], docsComFoto: [], docsSemBaixaEntrega: []
       });
     }
     return unitMap.get(unit)!;
@@ -104,14 +116,12 @@ export const calculateStats = (
 
   data.metas.forEach(m => { getOrCreateStats(m.unidade).meta = m.meta; });
 
-  const hasDateFilter = dateRange?.start && dateRange?.end;
   const filterStart = dateRange?.start ? new Date(dateRange.start.setHours(0,0,0,0)) : null;
   const filterEnd = dateRange?.end ? new Date(dateRange.end.setHours(23,59,59,999)) : null;
 
-  // Identifica a última data real com movimento no período
   let actualMaxDate: string | null = null;
   data.ctes.forEach(cte => {
-    if (hasDateFilter && filterStart && filterEnd) {
+    if (filterStart && filterEnd) {
       if (cte.data < filterStart || cte.data > filterEnd) return;
     }
     const ymd = toYMD(cte.data);
@@ -121,7 +131,7 @@ export const calculateStats = (
   summary.dataVendasDia = actualMaxDate || toYMD(data.lastUpdate);
 
   data.ctes.forEach(cte => {
-    if (hasDateFilter && filterStart && filterEnd) {
+    if (filterStart && filterEnd) {
       if (cte.data < filterStart || cte.data > filterEnd) return; 
     }
 
@@ -134,11 +144,9 @@ export const calculateStats = (
 
     summary.totalDocs++;
     
-    // 1. Lógica Global de Manifestos (Consistência 100%)
     if (statusMdfe.match(/COM MDFE|ENCERRADO|AUTORIZADO/i)) summary.manifestos.comMdfe++;
     else summary.manifestos.semMdfe++;
 
-    // 2. Lógica Global de Pendências e Fotos (Consistência 100%)
     const isSemBaixa = statusPrazo === '' || statusPrazo === 'SEM DATA' || statusEntrega === 'SEM BAIXA' || statusEntrega.includes('NÃO BAIXADO');
     
     if (isSemBaixa) {
@@ -148,15 +156,13 @@ export const calculateStats = (
       if (statusPrazo === 'NO PRAZO') summary.pendencias.ok++;
       else summary.pendencias.atraso++;
 
-      if (statusEntrega === 'COM FOTO') summary.fotos.comFoto++;
+      if (statusEntrega.includes('COM FOTO')) summary.fotos.comFoto++;
       else summary.fotos.semFoto++;
     }
 
-    // 3. Lógica Global de Faturamento
     summary.faturamento += cte.valor;
     if (cteYMD === summary.dataVendasDia) summary.vendasDia += cte.valor;
 
-    // 4. Lógica por Unidade (Rankings)
     if (unitColeta) {
       const stats = getOrCreateStats(unitColeta);
       stats.faturamento += cte.valor;
@@ -173,6 +179,7 @@ export const calculateStats = (
         stats.semBaixa++;
         stats.semBaixaEntrega++;
         stats.docsSemBaixa.push(cte);
+        stats.docsSemBaixaEntrega.push(cte);
       } else {
         if (statusPrazo === 'NO PRAZO') {
           stats.baixaNoPrazo++;
@@ -181,8 +188,14 @@ export const calculateStats = (
           stats.baixaForaPrazo++;
           stats.docsBaixaForaPrazo.push(cte);
         }
-        if (statusEntrega === 'COM FOTO') stats.comFoto++;
-        else { stats.semFoto++; stats.docsSemFoto.push(cte); }
+        
+        if (statusEntrega.includes('COM FOTO')) {
+          stats.comFoto++;
+          stats.docsComFoto.push(cte);
+        } else {
+          stats.semFoto++;
+          stats.docsSemFoto.push(cte);
+        }
       }
     }
   });

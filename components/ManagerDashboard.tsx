@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { UnitStats, Cte } from '../types';
 import Card from './Card';
-import { DollarSign, Truck, FileText, Search, ArrowUpDown, Calendar, LayoutDashboard, Building2, AlertTriangle, ArrowUp, ArrowDown, Clock, Camera, Download, Info } from 'lucide-react';
+import { DollarSign, Truck, FileText, Search, ArrowUpDown, Calendar, LayoutDashboard, Building2, AlertTriangle, ArrowUp, ArrowDown, Clock, Camera, CameraOff, Download, Info } from 'lucide-react';
 import { normalizeStatus, DashboardSummary } from '../services/calculationService';
 import DailyRevenueChart from './DailyRevenueChart';
 import { toPng } from 'html-to-image';
@@ -23,7 +23,7 @@ type DashboardTab = 'gerencial' | 'unidades';
 
 type SalesSortField = 'unidade' | 'faturamento' | 'meta' | 'projecao' | 'percentualProjecao';
 type DeliverySortField = 'unidade' | 'totalRecebimentos' | 'pctNoPrazo' | 'pctSemBaixa' | 'pctForaPrazo';
-type PhotoSortField = 'unidade' | 'totalFotos' | 'pctComFoto' | 'pctSemFoto' | 'pctSemBaixaEntrega';
+type PhotoSortField = 'unidade' | 'totalFotos' | 'pctComFoto' | 'pctSemFoto';
 
 const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, summary, allCtes, onSelectUnit, onDateFilterChange, dateRange, lastUpdate, fixedDays }) => {
   const [activeTab, setActiveTab] = useState<DashboardTab>('gerencial');
@@ -37,10 +37,13 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, summary, all
   
   const [salesSort, setSalesSort] = useState<{field: SalesSortField, dir: SortDirection}>({ field: 'faturamento', dir: 'desc' });
   const [deliverySort, setDeliverySort] = useState<{field: DeliverySortField, dir: SortDirection}>({ field: 'pctNoPrazo', dir: 'desc' });
-  const [photoSort, setPhotoSort] = useState<{field: PhotoSortField, dir: SortDirection}>({ field: 'pctSemFoto', dir: 'desc' });
+  const [photoSort, setPhotoSort] = useState<{field: PhotoSortField, dir: SortDirection}>({ field: 'pctComFoto', dir: 'desc' });
 
   const [deliveryLocalStart, setDeliveryLocalStart] = useState('');
   const [deliveryLocalEnd, setDeliveryLocalEnd] = useState('');
+  
+  const [photoLocalStart, setPhotoLocalStart] = useState('');
+  const [photoLocalEnd, setPhotoLocalEnd] = useState('');
 
   const filteredStats = useMemo(() => stats.filter(s => s.unidade.includes(filter.toUpperCase())), [stats, filter]);
 
@@ -60,8 +63,11 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, summary, all
     const end = deliveryLocalEnd ? new Date(deliveryLocalEnd + 'T23:59:59') : null;
 
     allCtes.forEach(cte => {
-      if (start && cte.data < start) return;
-      if (end && cte.data > end) return;
+      // Filtra pelo Prazo de Baixa (Coluna F) ou usa unidade de destino (I)
+      if (!cte.prazoBaixa) return;
+      if (start && cte.prazoBaixa < start) return;
+      if (end && cte.prazoBaixa > end) return;
+      
       const statusPrazo = normalizeStatus(cte.statusPrazo);
       const statusEntrega = normalizeStatus(cte.statusEntrega);
       const isSemBaixa = statusPrazo === '' || statusPrazo === 'SEM DATA' || statusEntrega === 'SEM BAIXA' || statusEntrega.includes('NÃO BAIXADO');
@@ -72,7 +78,33 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, summary, all
     });
 
     return { ok, pend, atraso };
-  }, [allCtes, deliveryLocalStart, deliveryLocalEnd, summary]);
+  }, [allCtes, deliveryLocalStart, deliveryLocalEnd, summary.pendencias]);
+
+  const photoStatsLocal = useMemo(() => {
+    let com = 0, sem = 0;
+    const start = photoLocalStart ? new Date(photoLocalStart + 'T00:00:00') : null;
+    const end = photoLocalEnd ? new Date(photoLocalEnd + 'T23:59:59') : null;
+
+    if (photoLocalStart || photoLocalEnd) {
+      allCtes.forEach(cte => {
+        // FILTRO DATA BAIXA (AGORA MAPEADA DA COLUNA D)
+        if (!cte.dataBaixa) return;
+        
+        if (start && cte.dataBaixa < start) return;
+        if (end && cte.dataBaixa > end) return;
+
+        const statusEntrega = normalizeStatus(cte.statusEntrega);
+        if (statusEntrega.includes('COM FOTO')) com++;
+        else if (statusEntrega.includes('SEM FOTO')) sem++;
+      });
+      return { com, sem };
+    }
+    return { com: summary.fotos.comFoto, sem: summary.fotos.semFoto };
+  }, [allCtes, photoLocalStart, photoLocalEnd, summary.fotos]);
+
+  const totalBaseFotosLocal = photoStatsLocal.com + photoStatsLocal.sem;
+  const pctFotoOk = totalBaseFotosLocal > 0 ? (photoStatsLocal.com / totalBaseFotosLocal) * 100 : 0;
+  const pctFotoSem = totalBaseFotosLocal > 0 ? (photoStatsLocal.sem / totalBaseFotosLocal) * 100 : 0;
 
   const handleUnitClick = (unit: string) => {
     setHighlightedUnit(unit);
@@ -116,8 +148,8 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, summary, all
 
   const sortedPhotoStats = useMemo(() => {
     return filteredStats.map(s => {
-      const total = s.comFoto + s.semFoto + s.semBaixaEntrega;
-      return { ...s, totalFotos: total, pctComFoto: total > 0 ? (s.comFoto / total) * 100 : 0, pctSemFoto: total > 0 ? (s.semFoto / total) * 100 : 0, pctSemBaixaEntrega: total > 0 ? (s.semBaixaEntrega / total) * 100 : 0 };
+      const totalComS = s.comFoto + s.semFoto;
+      return { ...s, totalBaseFotos: totalComS, pctComFoto: totalComS > 0 ? (s.comFoto / totalComS) * 100 : 0, pctSemFoto: totalComS > 0 ? (s.semFoto / totalComS) * 100 : 0 };
     }).sort((a, b) => {
       const valA = a[photoSort.field as keyof typeof a] as number;
       const valB = b[photoSort.field as keyof typeof b] as number;
@@ -138,11 +170,8 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, summary, all
   const pctOk = totalPend > 0 ? (deliveryStatsLocal.ok / totalPend) * 100 : 0;
   const pctPend = totalPend > 0 ? (deliveryStatsLocal.pend / totalPend) * 100 : 0;
 
-  const totalFotos = summary.fotos.comFoto + summary.fotos.semFoto + summary.fotos.pendBxa;
-
   return (
     <div className="space-y-6 animate-fade-in pb-10">
-      {/* FILTER & UPDATE HEADER */}
       <div className="bg-white px-5 py-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col md:flex-row justify-between items-center gap-5">
         <div className="flex items-center text-sle-primary bg-blue-50/50 px-4 py-2 rounded-xl border border-blue-100/30">
           <Clock className="w-4 h-4 mr-2.5 opacity-60" />
@@ -165,12 +194,11 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, summary, all
 
       {activeTab === 'gerencial' ? (
         <div className="space-y-6 animate-fade-in">
-          {/* Card section remains identical to ensure consistency */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <Card title="PENDÊNCIAS DE ENTREGA" icon={<Truck className="w-5 h-5 opacity-30"/>} className="border-l-warning">
                <div className="flex flex-col gap-4">
                   <div className="bg-gray-50/50 p-2 rounded-xl border border-gray-100 flex flex-col items-center">
-                      <span className="text-[9px] font-bold text-gray-400 uppercase mb-2 tracking-widest leading-none">Filtrar Prazo:</span>
+                      <span className="text-[9px] font-bold text-gray-400 uppercase mb-2 tracking-widest leading-none">Filtrar Prazo (F):</span>
                       <div className="flex items-center gap-1">
                           <input type="date" value={deliveryLocalStart} onChange={(e) => setDeliveryLocalStart(e.target.value)} className="bg-white border border-gray-200 text-[10px] p-1.5 rounded-lg outline-none w-26 font-semibold shadow-sm" />
                           <span className="text-gray-300">-</span>
@@ -197,21 +225,26 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, summary, all
 
             <Card title="STATUS ENTREGA (FOTO)" icon={<Camera className="w-5 h-5 text-green-600 opacity-30" />} className="border-l-green-600">
                <div className="flex flex-col gap-4">
-                  <div className="grid grid-cols-3 gap-3 h-[100px] items-center text-center pt-6">
+                  <div className="bg-gray-50/50 p-2 rounded-xl border border-gray-100 flex flex-col items-center">
+                      <span className="text-[9px] font-bold text-gray-400 uppercase mb-2 tracking-widest leading-none">Filtrar Baixa (D):</span>
+                      <div className="flex items-center gap-1">
+                          <input type="date" value={photoLocalStart} onChange={(e) => setPhotoLocalStart(e.target.value)} className="bg-white border border-gray-200 text-[10px] p-1.5 rounded-lg outline-none w-26 font-semibold shadow-sm" />
+                          <span className="text-gray-300">-</span>
+                          <input type="date" value={photoLocalEnd} onChange={(e) => setPhotoLocalEnd(e.target.value)} className="bg-white border border-gray-200 text-[10px] p-1.5 rounded-lg outline-none w-26 font-semibold shadow-sm" />
+                      </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 h-[90px] items-center text-center">
                      <div className="flex flex-col items-center justify-center border border-green-100 bg-green-50/30 p-2.5 rounded-xl">
-                        <span className="text-2xl font-semibold text-green-700 leading-none">{summary.fotos.comFoto}</span>
-                        <span className="text-[9px] font-bold text-green-600 uppercase mt-2">{(summary.fotos.comFoto / Math.max(1, totalFotos) * 100).toFixed(0)}% FOTO</span>
+                        <span className="text-2xl font-semibold text-green-700 leading-none">{photoStatsLocal.com}</span>
+                        <span className="text-[9px] font-bold text-green-600 uppercase mt-2">{pctFotoOk.toFixed(0)}% OK</span>
                      </div>
                      <div className="flex flex-col items-center justify-center border-2 border-red-200/60 bg-red-50/50 p-3 rounded-2xl shadow-sm transform scale-110 z-10 border-dashed">
-                        <span className="text-2xl font-semibold text-red-700 leading-none">{summary.fotos.semFoto}</span>
-                        <span className="text-[9px] font-bold text-red-600 uppercase mt-1 tracking-tighter">SEM FOTO</span>
-                     </div>
-                     <div className="flex flex-col items-center justify-center border border-yellow-200/60 bg-yellow-50/40 p-2.5 rounded-xl">
-                        <span className="text-2xl font-semibold text-yellow-700 leading-none">{summary.fotos.pendBxa}</span>
-                        <span className="text-[9px] font-bold text-yellow-600 uppercase mt-2">PND BXA</span>
+                        <CameraOff className="w-4 h-4 text-red-600 mx-auto mb-1.5 opacity-60" />
+                        <span className="text-2xl font-semibold text-red-700 leading-none">{photoStatsLocal.sem}</span>
+                        <span className="text-[9px] font-bold text-red-600 uppercase mt-1 tracking-tighter">{pctFotoSem.toFixed(0)}% S/ FOTO</span>
                      </div>
                   </div>
-                  <div className="text-[9px] text-gray-400 font-bold uppercase tracking-widest text-center mt-2 opacity-60">Consolidado Comprovantes</div>
+                  <div className="text-[9px] text-gray-400 font-bold uppercase tracking-widest text-center mt-2 opacity-60">Comprovantes Digitais</div>
                </div>
             </Card>
 
@@ -288,7 +321,6 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, summary, all
           </div>
 
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-            {/* RANKING FINANCEIRO */}
             <div ref={salesRef} className="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100 xl:col-span-2">
                 <div className="p-5 border-b border-gray-50 bg-gray-50/20 flex items-center justify-between">
                   <h3 className="font-bold text-xs uppercase tracking-widest text-sle-dark opacity-70">Ranking Financeiro</h3>
@@ -330,7 +362,6 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, summary, all
                 </div>
             </div>
 
-            {/* RANKING ENTREGAS */}
             <div ref={deliveryRef} className="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100">
                 <div className="p-5 border-b border-gray-50 bg-gray-50/20 flex items-center justify-between">
                   <h3 className="font-bold text-xs uppercase tracking-widest text-yellow-600 opacity-80">Ranking Entregas</h3>
@@ -368,7 +399,6 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, summary, all
                 </div>
             </div>
 
-            {/* RANKING FOTOS */}
             <div ref={photoRef} className="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100">
                 <div className="p-5 border-b border-gray-50 bg-gray-50/20 flex items-center justify-between">
                   <h3 className="font-bold text-xs uppercase tracking-widest text-green-700 opacity-80">Ranking Fotos</h3>
@@ -378,7 +408,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, summary, all
                     </button>
                     <div className="group relative flex items-center">
                       <Info className="w-4 h-4 text-gray-300 cursor-help" />
-                      <div className="absolute bottom-full right-0 mb-2 w-48 p-2 bg-gray-800 text-white text-[10px] rounded shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity font-medium z-20">Porcentagem de comprovantes vinculados (Fotos na Column M).</div>
+                      <div className="absolute bottom-full right-0 mb-2 w-48 p-2 bg-gray-800 text-white text-[10px] rounded shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity font-medium z-20">Porcentagem de comprovantes vinculados (Baseada apenas em documentos baixados).</div>
                     </div>
                   </div>
                 </div>
@@ -389,7 +419,6 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, summary, all
                         <th className="px-4 py-3 cursor-pointer" onClick={() => setPhotoSort({field:'unidade', dir: photoSort.dir==='asc'?'desc':'asc'})}><div className="flex items-center font-bold text-[10px]">AGÊNCIA <SortIcon active={photoSort.field === 'unidade'} dir={photoSort.dir} /></div></th>
                         <th className="text-center cursor-pointer" onClick={() => setPhotoSort({field:'pctComFoto', dir: photoSort.dir==='asc'?'desc':'asc'})}><div className="flex items-center justify-center font-bold text-[10px] text-green-700">% FOTO <SortIcon active={photoSort.field === 'pctComFoto'} dir={photoSort.dir} /></div></th>
                         <th className="text-center cursor-pointer" onClick={() => setPhotoSort({field:'pctSemFoto', dir: photoSort.dir==='asc'?'desc':'asc'})}><div className="flex items-center justify-center font-bold text-[10px] text-red-700">% SEM <SortIcon active={photoSort.field === 'pctSemFoto'} dir={photoSort.dir} /></div></th>
-                        <th className="text-center cursor-pointer" onClick={() => setPhotoSort({field:'pctSemBaixaEntrega', dir: photoSort.dir==='asc'?'desc':'asc'})}><div className="flex items-center justify-center font-bold text-[10px] text-yellow-700">% PND <SortIcon active={photoSort.field === 'pctSemBaixaEntrega'} dir={photoSort.dir} /></div></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
@@ -398,7 +427,6 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, summary, all
                           <td className="px-4 py-4 font-semibold uppercase text-gray-700 truncate">{stat.unidade}</td>
                           <td className="px-1 py-4 text-center text-green-600 font-semibold">{stat.pctComFoto.toFixed(0)}%</td>
                           <td className="px-1 py-4 text-center text-red-700 font-semibold">{stat.pctSemFoto.toFixed(0)}%</td>
-                          <td className="px-1 py-4 text-center text-yellow-700 font-semibold">{stat.pctSemBaixaEntrega.toFixed(0)}%</td>
                         </tr>
                       ))}
                     </tbody>
