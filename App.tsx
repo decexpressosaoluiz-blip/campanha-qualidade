@@ -48,11 +48,6 @@ const App: React.FC = () => {
         }
       }
 
-      const today = new Date();
-      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
-      const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0];
-      if (!dateRange.start) setDateRange({ start: firstDay, end: lastDay });
-
       const metas = metaRows.slice(1).map(row => ({
         unidade: normalizeUnitName(row[0]),
         meta: parseCurrency(row[1])
@@ -79,12 +74,21 @@ const App: React.FC = () => {
         };
       }).filter((c): c is NonNullable<typeof c> => c !== null);
 
+      const lastUpdate = maxDateFound.getTime() > 0 ? maxDateFound : new Date();
+      
+      // Ajuste de filtros iniciais
+      const startOfCurrentMonth = new Date(lastUpdate.getFullYear(), lastUpdate.getMonth(), 1);
+      const startDateStr = startOfCurrentMonth.toISOString().split('T')[0];
+      const endDateStr = lastUpdate.toISOString().split('T')[0];
+      
+      if (!dateRange.start) setDateRange({ start: startDateStr, end: endDateStr });
+
       setData({
         ctes,
         metas,
         refDate,
         holidays,
-        lastUpdate: maxDateFound.getTime() > 0 ? maxDateFound : new Date(),
+        lastUpdate,
         fixedDays: { total: fixedTotalDays || 21, elapsed: fixedElapsedDays || 1 }
       });
     } catch (err) {
@@ -100,29 +104,17 @@ const App: React.FC = () => {
     try {
        const userRows = await fetchCsv(CSV_URLS.USUARIOS);
        const users = userRows.slice(1);
-       
        const userFound = users.find(row => row[0]?.toLowerCase() === username.toLowerCase());
        
-       if (!userFound) {
-         setLoginError('Usuário incorreto');
-         return;
-       }
-
-       if (userFound[1] !== pass) {
-         setLoginError('Senha incorreta');
-         return;
-       }
+       if (!userFound) { setLoginError('Usuário incorreto'); return; }
+       if (userFound[1] !== pass) { setLoginError('Senha incorreta'); return; }
 
        const unit = userFound[2] ? normalizeUnitName(userFound[2]) : '';
        setUser({ username: userFound[0], unit });
        await loadData();
        if (!unit) setView(DashboardView.MANAGER);
        else { setSelectedUnit(unit); setView(DashboardView.UNIT_DETAIL); }
-    } catch (e) { 
-      setLoginError('Erro ao autenticar. Tente novamente.'); 
-    } finally { 
-      setLoading(false); 
-    }
+    } catch (e) { setLoginError('Erro ao autenticar.'); } finally { setLoading(false); }
   };
 
   const handleLogout = () => { setUser(null); setData(null); setView(DashboardView.LOGIN); setSelectedUnit(null); setLoginError(''); };
@@ -135,9 +127,9 @@ const App: React.FC = () => {
       </div>
     );
     if (error) return (
-      <div className="flex flex-col items-center justify-center h-[60vh] text-red-600">
+      <div className="flex flex-col items-center justify-center h-[60vh] text-red-600 text-center px-4">
          <p className="font-bold">{error}</p>
-         <button onClick={loadData} className="mt-4 px-4 py-2 bg-[#2E31B4] text-white rounded">Tentar Novamente</button>
+         <button onClick={loadData} className="mt-4 px-6 py-2 bg-[#2E31B4] text-white rounded-xl shadow-lg">Tentar Novamente</button>
       </div>
     );
     if (view === DashboardView.LOGIN) return <Login onLogin={handleLogin} loading={loading} error={loginError} />;
@@ -148,11 +140,11 @@ const App: React.FC = () => {
     };
 
     if (view === DashboardView.MANAGER && data) {
-      const stats = calculateStats(data, undefined, calculationDateRange);
-      return <ManagerDashboard stats={stats} allCtes={data.ctes} onSelectUnit={(u) => { setSelectedUnit(u); setView(DashboardView.UNIT_DETAIL); }} onDateFilterChange={(start, end) => setDateRange({ start, end })} dateRange={dateRange} lastUpdate={data.lastUpdate} fixedDays={data.fixedDays} />;
+      const { stats, summary } = calculateStats(data, undefined, calculationDateRange);
+      return <ManagerDashboard stats={stats} summary={summary} allCtes={data.ctes} onSelectUnit={(u) => { setSelectedUnit(u); setView(DashboardView.UNIT_DETAIL); }} onDateFilterChange={(start, end) => setDateRange({ start, end })} dateRange={dateRange} lastUpdate={data.lastUpdate} fixedDays={data.fixedDays} />;
     }
     if (view === DashboardView.UNIT_DETAIL && data && selectedUnit) {
-      const stats = calculateStats(data, selectedUnit, calculationDateRange);
+      const { stats } = calculateStats(data, selectedUnit, calculationDateRange);
       return <UnitDashboard 
         stats={stats[0]} 
         user={user} 

@@ -46,12 +46,48 @@ export const parseDate = (value: string): Date | null => {
   return null;
 };
 
+// Auxiliar para comparação de datas sem fuso horário
+const toYMD = (date: Date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+export interface DashboardSummary {
+  totalDocs: number;
+  faturamento: number;
+  vendasDia: number;
+  dataVendasDia: string;
+  pendencias: {
+    ok: number;
+    pend: number;
+    atraso: number;
+  };
+  fotos: {
+    comFoto: number;
+    semFoto: number;
+    pendBxa: number;
+  };
+  manifestos: {
+    comMdfe: number;
+    semMdfe: number;
+  };
+}
+
 export const calculateStats = (
   data: AppData, 
   specificUnit?: string, 
   dateRange?: { start: Date | null, end: Date | null }
-): UnitStats[] => {
+): { stats: UnitStats[], summary: DashboardSummary } => {
   const unitMap = new Map<string, UnitStats>();
+  
+  const summary: DashboardSummary = {
+    totalDocs: 0, faturamento: 0, vendasDia: 0, dataVendasDia: '',
+    pendencias: { ok: 0, pend: 0, atraso: 0 },
+    fotos: { comFoto: 0, semFoto: 0, pendBxa: 0 },
+    manifestos: { comMdfe: 0, semMdfe: 0 }
+  };
 
   const getOrCreateStats = (unit: string): UnitStats => {
     if (!unitMap.has(unit)) {
@@ -72,8 +108,17 @@ export const calculateStats = (
   const filterStart = dateRange?.start ? new Date(dateRange.start.setHours(0,0,0,0)) : null;
   const filterEnd = dateRange?.end ? new Date(dateRange.end.setHours(23,59,59,999)) : null;
 
-  // Define a data alvo para "Vendas do Dia" (último dia do período ou última atualização)
-  const targetDateStr = (filterEnd || data.lastUpdate).toISOString().split('T')[0];
+  // Identifica a última data real com movimento no período
+  let actualMaxDate: string | null = null;
+  data.ctes.forEach(cte => {
+    if (hasDateFilter && filterStart && filterEnd) {
+      if (cte.data < filterStart || cte.data > filterEnd) return;
+    }
+    const ymd = toYMD(cte.data);
+    if (!actualMaxDate || ymd > actualMaxDate) actualMaxDate = ymd;
+  });
+
+  summary.dataVendasDia = actualMaxDate || toYMD(data.lastUpdate);
 
   data.ctes.forEach(cte => {
     if (hasDateFilter && filterStart && filterEnd) {
@@ -82,32 +127,48 @@ export const calculateStats = (
 
     const unitColeta = normalizeUnitName(cte.unidadeColeta);
     const unitEntrega = normalizeUnitName(cte.unidadeEntrega);
-    
-    // Todos os documentos contribuem para o pool de cálculos se tiverem unidade
-    const unitRef = unitColeta || unitEntrega;
-    if (!unitRef) return;
-
-    const stats = getOrCreateStats(unitRef);
     const statusMdfe = normalizeStatus(cte.statusMdfe);
     const statusPrazo = normalizeStatus(cte.statusPrazo);
     const statusEntrega = normalizeStatus(cte.statusEntrega);
+    const cteYMD = toYMD(cte.data);
 
-    // 1. Lógica de Faturamento e MDFE
+    summary.totalDocs++;
+    
+    // 1. Lógica Global de Manifestos (Consistência 100%)
+    if (statusMdfe.match(/COM MDFE|ENCERRADO|AUTORIZADO/i)) summary.manifestos.comMdfe++;
+    else summary.manifestos.semMdfe++;
+
+    // 2. Lógica Global de Pendências e Fotos (Consistência 100%)
+    const isSemBaixa = statusPrazo === '' || statusPrazo === 'SEM DATA' || statusEntrega === 'SEM BAIXA' || statusEntrega.includes('NÃO BAIXADO');
+    
+    if (isSemBaixa) {
+      summary.pendencias.pend++;
+      summary.fotos.pendBxa++;
+    } else {
+      if (statusPrazo === 'NO PRAZO') summary.pendencias.ok++;
+      else summary.pendencias.atraso++;
+
+      if (statusEntrega === 'COM FOTO') summary.fotos.comFoto++;
+      else summary.fotos.semFoto++;
+    }
+
+    // 3. Lógica Global de Faturamento
+    summary.faturamento += cte.valor;
+    if (cteYMD === summary.dataVendasDia) summary.vendasDia += cte.valor;
+
+    // 4. Lógica por Unidade (Rankings)
     if (unitColeta) {
+      const stats = getOrCreateStats(unitColeta);
       stats.faturamento += cte.valor;
       stats.docsVendas.push(cte);
-      if (cte.data.toISOString().split('T')[0] === targetDateStr) {
-        stats.vendasDiaAnterior += cte.valor;
-      }
+      if (cteYMD === summary.dataVendasDia) stats.vendasDiaAnterior += cte.valor;
       if (statusMdfe.match(/COM MDFE|ENCERRADO|AUTORIZADO/i)) stats.comMdfe++;
       else { stats.semMdfe++; stats.docsSemMdfe.push(cte); }
     }
 
-    // 2. Lógica de Entrega e Foto (Unificando critérios para evitar 705 vs 706)
     if (unitEntrega) {
+      const stats = getOrCreateStats(unitEntrega);
       stats.recebido += cte.valor;
-      const isSemBaixa = statusPrazo === '' || statusPrazo === 'SEM DATA' || statusEntrega === 'SEM BAIXA' || statusEntrega.includes('NÃO BAIXADO');
-
       if (isSemBaixa) {
         stats.semBaixa++;
         stats.semBaixaEntrega++;
@@ -120,12 +181,8 @@ export const calculateStats = (
           stats.baixaForaPrazo++;
           stats.docsBaixaForaPrazo.push(cte);
         }
-
         if (statusEntrega === 'COM FOTO') stats.comFoto++;
-        else {
-          stats.semFoto++;
-          stats.docsSemFoto.push(cte);
-        }
+        else { stats.semFoto++; stats.docsSemFoto.push(cte); }
       }
     }
   });
@@ -138,6 +195,10 @@ export const calculateStats = (
     stats.percentualProjecao = stats.meta > 0 ? (stats.projecao / stats.meta) * 100 : 0;
   });
 
-  const results = Array.from(unitMap.values());
-  return specificUnit ? results.filter(s => s.unidade === normalizeUnitName(specificUnit)) : results;
+  let statsList = Array.from(unitMap.values());
+  if (specificUnit) {
+    statsList = statsList.filter(s => s.unidade === normalizeUnitName(specificUnit));
+  }
+
+  return { stats: statsList, summary };
 };

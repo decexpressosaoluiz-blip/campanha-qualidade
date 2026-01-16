@@ -93,7 +93,7 @@ const DailyRevenueChart: React.FC<DailyRevenueChartProps> = ({ ctes, unitName, s
 
         <div className="h-[360px] w-full pt-6">
             <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData.data} margin={{ top: 40, right: 20, left: 10, bottom: 0 }}>
+                <AreaChart data={chartData.data} margin={{ top: 60, right: 30, left: 10, bottom: 0 }}>
                     <defs>
                         <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor="#2E31B4" stopOpacity={0.15}/>
@@ -114,7 +114,7 @@ const DailyRevenueChart: React.FC<DailyRevenueChartProps> = ({ ctes, unitName, s
                     />
                     <YAxis 
                         hide={true}
-                        domain={[0, (dataMax: number) => dataMax * 1.35]}
+                        domain={[0, (dataMax: number) => dataMax * 1.4]}
                     />
                     <Tooltip 
                         cursor={{ stroke: '#e5e7eb', strokeWidth: 1 }}
@@ -153,12 +153,6 @@ const DailyRevenueChart: React.FC<DailyRevenueChartProps> = ({ ctes, unitName, s
                                                 <span className="text-gray-400 font-bold text-[10px] uppercase">Documentos</span>
                                                 <span className="font-bold text-gray-700">{data.count}</span>
                                             </div>
-                                            <div className="pt-2 border-t border-gray-50 flex justify-between items-center">
-                                                <span className="text-gray-400 font-bold text-[10px] uppercase">Ticket Médio</span>
-                                                <span className="font-bold text-blue-600">
-                                                    {(data.value / data.count).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                                                </span>
-                                            </div>
                                         </div>
                                     </div>
                                 );
@@ -179,8 +173,8 @@ const DailyRevenueChart: React.FC<DailyRevenueChartProps> = ({ ctes, unitName, s
                         <LabelList 
                             dataKey="value" 
                             position="top" 
-                            offset={20}
-                            formatter={(val: number) => `R$ ${val.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}`}
+                            offset={30}
+                            formatter={(val: number) => `R$ ${Number(val).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                             style={{ 
                                 fontSize: '11px', 
                                 fontWeight: '800', 
@@ -188,18 +182,12 @@ const DailyRevenueChart: React.FC<DailyRevenueChartProps> = ({ ctes, unitName, s
                                 fontFamily: 'inherit',
                                 paintOrder: 'stroke',
                                 stroke: '#fff',
-                                strokeWidth: '3px'
+                                strokeWidth: '4px'
                             }}
                         />
                     </Area>
                 </AreaChart>
             </ResponsiveContainer>
-        </div>
-        
-        <div className="mt-4 flex justify-end">
-            <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest bg-gray-50 px-3 py-1 rounded-md">
-                Média do Período: {chartData.average.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-            </div>
         </div>
     </div>
   );
