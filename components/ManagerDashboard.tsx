@@ -30,7 +30,9 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, summary, all
   const [filter, setFilter] = useState('');
   const [highlightedUnit, setHighlightedUnit] = useState<string | null>(null);
   
-  const chartRef = useRef<HTMLDivElement>(null);
+  // Ref agrupada para a seção financeira (Card Consolidação + Gráfico)
+  const financialRef = useRef<HTMLDivElement>(null);
+  
   const salesRef = useRef<HTMLDivElement>(null);
   const deliveryRef = useRef<HTMLDivElement>(null);
   const photoRef = useRef<HTMLDivElement>(null);
@@ -115,7 +117,15 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, summary, all
   const exportElement = async (ref: React.RefObject<HTMLDivElement | null>, fileName: string) => {
     if (!ref.current) return;
     try {
-      const dataUrl = await toPng(ref.current, { backgroundColor: '#ffffff', quality: 1 });
+      const dataUrl = await toPng(ref.current, { 
+        backgroundColor: '#F2F2F8', // Mantém a cor de fundo do dashboard para separar visualmente os cards
+        quality: 1,
+        filter: (node) => {
+           // Exclui elementos <button> da imagem gerada
+           if (node.tagName === 'BUTTON') return false;
+           return true;
+        }
+      });
       const link = document.createElement('a');
       link.download = `${fileName}-${new Date().toISOString().split('T')[0]}.png`;
       link.href = dataUrl;
@@ -268,47 +278,49 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, summary, all
             </Card>
           </div>
 
-          <Card title="FATURAMENTO CONSOLIDADO" icon={<DollarSign className="w-5 h-5 text-sle-primary opacity-40" />} className={`border-l-sle-primary transition-all duration-500 ${highlightedUnit ? 'ring-4 ring-sle-primary/20 scale-[1.01] bg-blue-50/30 shadow-xl' : ''}`}>
-            <div className="flex flex-col md:flex-row items-center gap-10 py-3">
-               <div className="flex-1 w-full text-center md:text-left">
-                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 opacity-80">Realizado Total</p>
-                   <span className="text-4xl font-semibold text-[#0F103A] tracking-tighter">{summary.faturamento.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</span>
-                   <p className="text-[11px] font-semibold text-gray-400 mt-2 uppercase tracking-tight">META GRUPO: {unitSummary.meta.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</p>
-               </div>
-               
-               <div className="flex-[2] w-full bg-[#F1F3FB]/70 p-6 rounded-3xl border border-blue-100/50 shadow-inner">
-                  <div className="flex justify-between items-end mb-4">
-                     <div className="flex flex-col">
-                        <span className="text-[11px] uppercase text-gray-400 font-bold tracking-widest">Projeção Consolidada</span>
-                        <span className="font-semibold text-sle-primary text-3xl mt-1 tracking-tight">{unitSummary.projecao.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</span>
-                     </div>
-                     <div className="text-right">
-                        <span className={`text-2xl font-semibold ${generalPercentProj >= 100 ? 'text-green-600' : 'text-red-600'}`}>{generalPercentProj.toFixed(1)}%</span>
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tight">Status Meta</p>
-                     </div>
-                  </div>
-                  <div className="relative w-full h-4 bg-white rounded-full overflow-hidden border border-blue-100">
-                      <div className={`absolute top-0 left-0 h-full opacity-20 ${generalPercentProj >= 100 ? 'bg-green-600' : 'bg-red-600'}`} style={{ width: `${Math.min(generalPercentProj, 100)}%` }}></div>
-                      <div className={`absolute top-0 left-0 h-full ${generalPercentProj >= 100 ? 'bg-green-600' : 'bg-red-600'}`} style={{ width: `${Math.min((summary.faturamento / Math.max(1, unitSummary.meta)) * 100, 100)}%` }}></div>
-                  </div>
-               </div>
+          <div ref={financialRef} className="space-y-6">
+            <Card title="FATURAMENTO CONSOLIDADO" icon={<DollarSign className="w-5 h-5 text-sle-primary opacity-40" />} className={`border-l-sle-primary transition-all duration-500 ${highlightedUnit ? 'ring-4 ring-sle-primary/20 scale-[1.01] bg-blue-50/30 shadow-xl' : ''}`}>
+              <div className="flex flex-col md:flex-row items-center gap-10 py-3">
+                <div className="flex-1 w-full text-center md:text-left">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 opacity-80">Realizado Total</p>
+                    <span className="text-4xl font-semibold text-[#0F103A] tracking-tighter">{summary.faturamento.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</span>
+                    <p className="text-[11px] font-semibold text-gray-400 mt-2 uppercase tracking-tight">META GRUPO: {unitSummary.meta.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</p>
+                </div>
+                
+                <div className="flex-[2] w-full bg-[#F1F3FB]/70 p-6 rounded-3xl border border-blue-100/50 shadow-inner">
+                    <div className="flex justify-between items-end mb-4">
+                      <div className="flex flex-col">
+                          <span className="text-[11px] uppercase text-gray-400 font-bold tracking-widest">Projeção Consolidada</span>
+                          <span className="font-semibold text-sle-primary text-3xl mt-1 tracking-tight">{unitSummary.projecao.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</span>
+                      </div>
+                      <div className="text-right">
+                          <span className={`text-2xl font-semibold ${generalPercentProj >= 100 ? 'text-green-600' : 'text-red-600'}`}>{generalPercentProj.toFixed(1)}%</span>
+                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tight">Status Meta</p>
+                      </div>
+                    </div>
+                    <div className="relative w-full h-4 bg-white rounded-full overflow-hidden border border-blue-100">
+                        <div className={`absolute top-0 left-0 h-full opacity-20 ${generalPercentProj >= 100 ? 'bg-green-600' : 'bg-red-600'}`} style={{ width: `${Math.min(generalPercentProj, 100)}%` }}></div>
+                        <div className={`absolute top-0 left-0 h-full ${generalPercentProj >= 100 ? 'bg-green-600' : 'bg-red-600'}`} style={{ width: `${Math.min((summary.faturamento / Math.max(1, unitSummary.meta)) * 100, 100)}%` }}></div>
+                    </div>
+                </div>
 
-               <div className="flex-1 w-full space-y-3">
-                  <div className="bg-blue-50/80 border border-blue-100/40 rounded-2xl p-4 flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-blue-800 uppercase tracking-tighter">Vendas dia {displayDateStr}</span>
-                      <span className="text-2xl font-semibold text-[#2E31B4] leading-none">{summary.vendasDia.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</span>
-                  </div>
-                  <div className="bg-white border border-gray-100 rounded-2xl p-4 flex justify-between items-center shadow-sm">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tighter">Meta Grupo p/ Dia</span>
-                      <span className="text-2xl font-semibold text-sle-primary leading-none">{metaDoDiaGeral.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</span>
-                  </div>
-               </div>
+                <div className="flex-1 w-full space-y-3">
+                    <div className="bg-blue-50/80 border border-blue-100/40 rounded-2xl p-4 flex justify-between items-center">
+                        <span className="text-[10px] font-bold text-blue-800 uppercase tracking-tighter">Vendas dia {displayDateStr}</span>
+                        <span className="text-2xl font-semibold text-[#2E31B4] leading-none">{summary.vendasDia.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</span>
+                    </div>
+                    <div className="bg-white border border-gray-100 rounded-2xl p-4 flex justify-between items-center shadow-sm">
+                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tighter">Meta Grupo p/ Dia</span>
+                        <span className="text-2xl font-semibold text-sle-primary leading-none">{metaDoDiaGeral.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</span>
+                    </div>
+                </div>
+              </div>
+            </Card>
+
+            <div className="relative group">
+              <DailyRevenueChart ctes={allCtes} startDate={dateRange.start ? new Date(dateRange.start + 'T00:00:00') : undefined} endDate={dateRange.end ? new Date(dateRange.end + 'T23:59:59') : undefined} />
+              <button onClick={() => exportElement(financialRef, 'faturamento-e-tendencia')} className="absolute top-4 right-4 p-2 bg-white rounded-lg border border-gray-200 shadow-sm hover:bg-gray-50 text-gray-500 hover:text-sle-primary transition-all opacity-0 group-hover:opacity-100 z-10" title="Exportar Gráfico (PNG)"><Download className="w-4 h-4" /></button>
             </div>
-          </Card>
-
-          <div ref={chartRef} className="relative group">
-            <DailyRevenueChart ctes={allCtes} startDate={dateRange.start ? new Date(dateRange.start + 'T00:00:00') : undefined} endDate={dateRange.end ? new Date(dateRange.end + 'T23:59:59') : undefined} />
-            <button onClick={() => exportElement(chartRef, 'faturamento-diario')} className="absolute top-4 right-4 p-2 bg-white rounded-lg border border-gray-200 shadow-sm hover:bg-gray-50 text-gray-500 hover:text-sle-primary transition-all opacity-0 group-hover:opacity-100 z-10" title="Exportar Gráfico (PNG)"><Download className="w-4 h-4" /></button>
           </div>
         </div>
       ) : (

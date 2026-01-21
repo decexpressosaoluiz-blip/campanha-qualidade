@@ -107,7 +107,7 @@ const DailyRevenueChart: React.FC<DailyRevenueChartProps> = ({ ctes, unitName, s
                             const [y, m, d] = val.split('-');
                             return `${d}/${m}`;
                         }}
-                        tick={{ fontSize: 10, fill: '#9ca3af', fontWeight: 600 }} 
+                        tick={{ fontSize: 11, fill: '#9ca3af', fontWeight: 600 }} 
                         axisLine={false}
                         tickLine={false}
                         dy={10}
@@ -173,16 +173,22 @@ const DailyRevenueChart: React.FC<DailyRevenueChartProps> = ({ ctes, unitName, s
                         <LabelList 
                             dataKey="value" 
                             position="top" 
-                            offset={30}
-                            formatter={(val: number) => `R$ ${Number(val).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                            offset={20}
+                            formatter={(val: number) => {
+                                const kVal = val / 1000;
+                                // Se for menor que 10k (ex: 0,4k, 2,1k), mostra 1 casa decimal.
+                                // Se for maior ou igual a 10k (ex: 44k), mostra 0 casas decimais.
+                                const digits = kVal < 10 ? 1 : 0;
+                                return `${kVal.toLocaleString('pt-BR', { minimumFractionDigits: digits, maximumFractionDigits: digits })}k`;
+                            }}
                             style={{ 
-                                fontSize: '11px', 
-                                fontWeight: '800', 
+                                fontSize: '13px', 
+                                fontWeight: '700', 
                                 fill: '#1f2937', 
                                 fontFamily: 'inherit',
                                 paintOrder: 'stroke',
                                 stroke: '#fff',
-                                strokeWidth: '4px'
+                                strokeWidth: '3px'
                             }}
                         />
                     </Area>
