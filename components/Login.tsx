@@ -51,7 +51,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, loading, error }) => {
                     type="text"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    className={`w-full pl-10 pr-4 py-3 text-sm bg-gray-50/50 border rounded-xl focus:ring-4 focus:ring-blue-100 focus:bg-white focus:border-sle-primary outline-none transition-all duration-200 ${error?.includes('Usuário') ? 'border-red-200 bg-red-50/30' : 'border-gray-100'}`}
+                    className={`w-full pl-10 pr-4 py-3 text-sm text-gray-900 bg-gray-50/50 border rounded-xl focus:ring-4 focus:ring-blue-100 focus:bg-white focus:border-sle-primary outline-none transition-all duration-200 ${error?.includes('Usuário') ? 'border-red-200 bg-red-50/30' : 'border-gray-100'}`}
                     placeholder="Digite seu usuário"
                     required
                   />
@@ -68,7 +68,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, loading, error }) => {
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className={`w-full pl-10 pr-4 py-3 text-sm bg-gray-50/50 border rounded-xl focus:ring-4 focus:ring-blue-100 focus:bg-white focus:border-sle-primary outline-none transition-all duration-200 ${error?.includes('Senha') ? 'border-red-200 bg-red-50/30' : 'border-gray-100'}`}
+                    className={`w-full pl-10 pr-4 py-3 text-sm text-gray-900 bg-gray-50/50 border rounded-xl focus:ring-4 focus:ring-blue-100 focus:bg-white focus:border-sle-primary outline-none transition-all duration-200 ${error?.includes('Senha') ? 'border-red-200 bg-red-50/30' : 'border-gray-100'}`}
                     placeholder="Digite sua senha"
                     required
                   />

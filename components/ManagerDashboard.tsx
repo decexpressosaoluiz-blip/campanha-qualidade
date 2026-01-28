@@ -179,6 +179,7 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, summary, all
   const totalPend = deliveryStatsLocal.ok + deliveryStatsLocal.pend + deliveryStatsLocal.atraso;
   const pctOk = totalPend > 0 ? (deliveryStatsLocal.ok / totalPend) * 100 : 0;
   const pctPend = totalPend > 0 ? (deliveryStatsLocal.pend / totalPend) * 100 : 0;
+  const pctAtraso = totalPend > 0 ? (deliveryStatsLocal.atraso / totalPend) * 100 : 0;
 
   return (
     <div className="space-y-6 animate-fade-in pb-10">
@@ -215,19 +216,18 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, summary, all
                           <input type="date" value={deliveryLocalEnd} onChange={(e) => setDeliveryLocalEnd(e.target.value)} className="bg-white border border-gray-200 text-[10px] p-1.5 rounded-lg outline-none w-26 font-semibold shadow-sm" />
                       </div>
                   </div>
-                 <div className="grid grid-cols-3 gap-2 items-center text-center h-[90px]">
-                   <div className="flex flex-col border-r border-gray-100 px-1">
+                 <div className="flex gap-2 h-[85px]">
+                   <div className="flex-1 flex flex-col items-center justify-center border border-green-100 bg-green-50/30 rounded-xl">
                       <span className="text-2xl font-semibold text-green-700 leading-none">{deliveryStatsLocal.ok}</span>
-                      <span className="text-[9px] font-bold text-green-600 bg-green-50/80 rounded-lg mt-3 py-1 uppercase">{pctOk.toFixed(0)}% OK</span>
+                      <span className="text-[9px] font-bold text-green-600 mt-2 uppercase">{pctOk.toFixed(0)}% NO PRAZO</span>
                    </div>
-                   <div className="flex flex-col bg-yellow-50/40 rounded-2xl px-2 py-4 border border-yellow-200/50 shadow-sm transform scale-105 z-10">
-                      <AlertTriangle className="w-4 h-4 text-yellow-600 mx-auto mb-1.5 opacity-60" />
+                   <div className="flex-1 flex flex-col items-center justify-center border border-yellow-200 bg-yellow-50/50 rounded-xl">
                       <span className="text-2xl font-semibold text-yellow-700 leading-none">{deliveryStatsLocal.pend}</span>
-                      <span className="text-[9px] font-bold text-yellow-600 mt-1 uppercase tracking-tighter">{pctPend.toFixed(0)}% PEND</span>
+                      <span className="text-[9px] font-bold text-yellow-600 mt-2 uppercase">{pctPend.toFixed(0)}% SEM BAIXA</span>
                    </div>
-                   <div className="flex flex-col border-l border-gray-100 px-1">
+                   <div className="flex-1 flex flex-col items-center justify-center border border-red-100 bg-red-50/30 rounded-xl">
                       <span className="text-2xl font-semibold text-red-700 leading-none">{deliveryStatsLocal.atraso}</span>
-                      <span className="text-[9px] font-bold text-red-600 bg-red-50/80 rounded-lg mt-3 py-1 uppercase">ATRASO</span>
+                      <span className="text-[9px] font-bold text-red-600 mt-2 uppercase">{pctAtraso.toFixed(0)}% FORA PRAZO</span>
                    </div>
                  </div>
                </div>
