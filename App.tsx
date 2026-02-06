@@ -22,6 +22,11 @@ const App: React.FC = () => {
   
   const [dateRange, setDateRange] = useState<{start: string, end: string}>({ start: '', end: '' });
 
+  // Carrega os dados assim que a aplicação monta para ter a data de atualização disponível
+  useEffect(() => {
+    loadData();
+  }, []);
+
   const loadData = async () => {
     setLoading(true);
     setError('');
@@ -112,29 +117,41 @@ const App: React.FC = () => {
 
        const unit = userFound[2] ? normalizeUnitName(userFound[2]) : '';
        setUser({ username: userFound[0], unit });
-       await loadData();
+       
+       // Dados já devem estar carregados pelo useEffect, mas se falhou, tenta de novo
+       if (!data) {
+         await loadData();
+       }
+
        if (!unit) setView(DashboardView.MANAGER);
        else { setSelectedUnit(unit); setView(DashboardView.UNIT_DETAIL); }
     } catch (e) { setLoginError('Erro ao autenticar.'); } finally { setLoading(false); }
   };
 
-  const handleLogout = () => { setUser(null); setData(null); setView(DashboardView.LOGIN); setSelectedUnit(null); setLoginError(''); };
+  const handleLogout = () => { 
+    setUser(null); 
+    // Não limpamos 'data' para manter a data de atualização na tela de login
+    setView(DashboardView.LOGIN); 
+    setSelectedUnit(null); 
+    setLoginError(''); 
+  };
 
   const renderContent = () => {
-    if (loading && !data) return (
+    // Se estiver carregando inicialmente e não tiver dados, mostra loader global
+    if (loading && !data && view !== DashboardView.LOGIN) return (
       <div className="flex flex-col items-center justify-center h-[60vh] text-[#2E31B4]">
         <Loader2 className="w-12 h-12 animate-spin mb-4" />
-        <p className="font-semibold animate-pulse">Carregando</p>
+        <p className="font-semibold animate-pulse">Carregando Sistema</p>
       </div>
     );
-    if (error) return (
+    
+    if (error && !data) return (
       <div className="flex flex-col items-center justify-center h-[60vh] text-red-600 text-center px-4">
          <p className="font-bold">{error}</p>
          <button onClick={loadData} className="mt-4 px-6 py-2 bg-[#2E31B4] text-white rounded-xl shadow-lg">Tentar Novamente</button>
       </div>
     );
-    if (view === DashboardView.LOGIN) return <Login onLogin={handleLogin} loading={loading} error={loginError} />;
-    
+
     const calculationDateRange = {
       start: dateRange.start ? new Date(dateRange.start + 'T12:00:00') : null,
       end: dateRange.end ? new Date(dateRange.end + 'T12:00:00') : null
@@ -161,6 +178,20 @@ const App: React.FC = () => {
     return null;
   };
 
+  // Alteração Crítica: Se for LOGIN, retorna sem o Layout para ocupar a tela toda
+  if (view === DashboardView.LOGIN) {
+    return (
+      <Login 
+        onLogin={handleLogin} 
+        loading={loading} 
+        error={loginError} 
+        lastUpdate={data?.lastUpdate} 
+        dataLoading={loading && !data}
+      />
+    );
+  }
+
+  // Para as outras views, usa o Layout padrão
   return (
     <Layout 
       user={user} 
