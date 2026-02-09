@@ -197,9 +197,9 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, summary, all
             
             <div className="flex items-center space-x-2 bg-white px-3 py-1.5 rounded-xl border border-gray-200 shadow-sm hover:border-sle-primary/30 transition-colors group">
                <Calendar className="w-4 h-4 text-gray-400 group-hover:text-sle-primary transition-colors" />
-               <input type="date" value={dateRange.start} onChange={(e) => onDateFilterChange(e.target.value, dateRange.end)} className="bg-transparent text-[10px] outline-none w-24 font-bold text-gray-600 uppercase" />
+               <input type="date" value={dateRange.start} onChange={(e) => onDateFilterChange(e.target.value, dateRange.end)} className="bg-transparent text-[10px] outline-none w-32 font-bold text-gray-600 uppercase" />
                <span className="text-gray-300">-</span>
-               <input type="date" value={dateRange.end} onChange={(e) => onDateFilterChange(dateRange.start, e.target.value)} className="bg-transparent text-[10px] outline-none w-24 font-bold text-gray-600 uppercase" />
+               <input type="date" value={dateRange.end} onChange={(e) => onDateFilterChange(dateRange.start, e.target.value)} className="bg-transparent text-[10px] outline-none w-32 font-bold text-gray-600 uppercase" />
             </div>
         </div>
       </div>
@@ -212,9 +212,9 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, summary, all
                   <div className="bg-gray-50/50 p-3 rounded-xl border border-gray-100 flex flex-col items-center">
                       <span className="text-[9px] font-semibold text-gray-400 uppercase mb-2 tracking-widest leading-none">Filtrar Prazo (F):</span>
                       <div className="flex items-center gap-1">
-                          <input type="date" value={deliveryLocalStart} onChange={(e) => setDeliveryLocalStart(e.target.value)} className="bg-white border border-gray-200 text-[10px] p-1.5 rounded-lg outline-none w-28 font-medium shadow-sm text-center uppercase text-gray-600" />
+                          <input type="date" value={deliveryLocalStart} onChange={(e) => setDeliveryLocalStart(e.target.value)} className="bg-white border border-gray-200 text-[10px] p-1.5 rounded-lg outline-none w-32 font-medium shadow-sm text-center uppercase text-gray-600" />
                           <span className="text-gray-300">-</span>
-                          <input type="date" value={deliveryLocalEnd} onChange={(e) => setDeliveryLocalEnd(e.target.value)} className="bg-white border border-gray-200 text-[10px] p-1.5 rounded-lg outline-none w-28 font-medium shadow-sm text-center uppercase text-gray-600" />
+                          <input type="date" value={deliveryLocalEnd} onChange={(e) => setDeliveryLocalEnd(e.target.value)} className="bg-white border border-gray-200 text-[10px] p-1.5 rounded-lg outline-none w-32 font-medium shadow-sm text-center uppercase text-gray-600" />
                       </div>
                   </div>
                  <div className="flex gap-3 h-[90px]">
@@ -239,9 +239,9 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, summary, all
                   <div className="bg-gray-50/50 p-3 rounded-xl border border-gray-100 flex flex-col items-center">
                       <span className="text-[9px] font-semibold text-gray-400 uppercase mb-2 tracking-widest leading-none">Filtrar Baixa (D):</span>
                       <div className="flex items-center gap-1">
-                          <input type="date" value={photoLocalStart} onChange={(e) => setPhotoLocalStart(e.target.value)} className="bg-white border border-gray-200 text-[10px] p-1.5 rounded-lg outline-none w-28 font-medium shadow-sm text-center uppercase text-gray-600" />
+                          <input type="date" value={photoLocalStart} onChange={(e) => setPhotoLocalStart(e.target.value)} className="bg-white border border-gray-200 text-[10px] p-1.5 rounded-lg outline-none w-32 font-medium shadow-sm text-center uppercase text-gray-600" />
                           <span className="text-gray-300">-</span>
-                          <input type="date" value={photoLocalEnd} onChange={(e) => setPhotoLocalEnd(e.target.value)} className="bg-white border border-gray-200 text-[10px] p-1.5 rounded-lg outline-none w-28 font-medium shadow-sm text-center uppercase text-gray-600" />
+                          <input type="date" value={photoLocalEnd} onChange={(e) => setPhotoLocalEnd(e.target.value)} className="bg-white border border-gray-200 text-[10px] p-1.5 rounded-lg outline-none w-32 font-medium shadow-sm text-center uppercase text-gray-600" />
                       </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4 h-[90px] items-center text-center">

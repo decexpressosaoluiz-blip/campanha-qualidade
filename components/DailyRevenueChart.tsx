@@ -107,7 +107,8 @@ const DailyRevenueChart: React.FC<DailyRevenueChartProps> = ({ ctes, unitName, s
                             const [y, m, d] = val.split('-');
                             return `${d}/${m}`;
                         }}
-                        tick={{ fontSize: 11, fill: '#9ca3af', fontWeight: 600 }} 
+                        tick={{ fontSize: 11, fill: '#1e3a8a', fontWeight: 700 }} 
+                        padding={{ left: 20, right: 20 }}
                         axisLine={false}
                         tickLine={false}
                         dy={10}

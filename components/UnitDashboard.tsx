@@ -357,9 +357,9 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
             <div className="flex items-center gap-3 w-full md:w-auto justify-center md:justify-end">
                 <div className="flex items-center space-x-2 bg-gray-50 px-4 py-2 rounded-xl border border-gray-200/50 hover:border-sle-primary/30 transition-colors group">
                    <Calendar className="w-4 h-4 text-gray-400 group-hover:text-sle-primary transition-colors" />
-                   <input type="date" value={dateRange.start} onChange={(e) => onDateFilterChange(e.target.value, dateRange.end)} className="bg-transparent text-[11px] outline-none w-26 font-bold text-gray-600 uppercase" />
+                   <input type="date" value={dateRange.start} onChange={(e) => onDateFilterChange(e.target.value, dateRange.end)} className="bg-transparent text-[10px] outline-none w-26 font-bold text-gray-600 uppercase" />
                    <span className="text-gray-300">-</span>
-                   <input type="date" value={dateRange.end} onChange={(e) => onDateFilterChange(dateRange.start, e.target.value)} className="bg-transparent text-[11px] outline-none w-26 font-bold text-gray-600 uppercase" />
+                   <input type="date" value={dateRange.end} onChange={(e) => onDateFilterChange(dateRange.start, e.target.value)} className="bg-transparent text-[10px] outline-none w-26 font-bold text-gray-600 uppercase" />
                 </div>
             </div>
         </div>
@@ -371,9 +371,9 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
               <div className="bg-gray-50/50 p-2 rounded-xl border border-gray-100 flex flex-col items-center">
                   <span className="text-[9px] font-semibold text-gray-400 uppercase mb-2 tracking-widest leading-none">Filtrar Prazo (F):</span>
                   <div className="flex items-center gap-1">
-                      <input type="date" value={deliveryStart} onChange={(e) => setDeliveryStart(e.target.value)} className="bg-white border border-gray-200 text-[10px] p-2 rounded-lg outline-none w-28 font-medium shadow-sm text-center uppercase text-gray-600" />
+                      <input type="date" value={deliveryStart} onChange={(e) => setDeliveryStart(e.target.value)} className="bg-white border border-gray-200 text-[10px] p-2 rounded-lg outline-none w-32 font-medium shadow-sm text-center uppercase text-gray-600" />
                       <span className="text-gray-300">-</span>
-                      <input type="date" value={deliveryEnd} onChange={(e) => setDeliveryEnd(e.target.value)} className="bg-white border border-gray-200 text-[10px] p-2 rounded-lg outline-none w-28 font-medium shadow-sm text-center uppercase text-gray-600" />
+                      <input type="date" value={deliveryEnd} onChange={(e) => setDeliveryEnd(e.target.value)} className="bg-white border border-gray-200 text-[10px] p-2 rounded-lg outline-none w-32 font-medium shadow-sm text-center uppercase text-gray-600" />
                   </div>
               </div>
               <div className="flex gap-2 h-[85px]">
@@ -398,9 +398,9 @@ const UnitDashboard: React.FC<UnitDashboardProps> = ({ stats, user, setHeaderAct
               <div className="bg-gray-50/50 p-2 rounded-xl border border-gray-100 flex flex-col items-center">
                   <span className="text-[9px] font-semibold text-gray-400 uppercase mb-2 tracking-widest leading-none">Filtrar Baixa (D):</span>
                   <div className="flex items-center gap-1">
-                      <input type="date" value={photoStart} onChange={(e) => setPhotoStart(e.target.value)} className="bg-white border border-gray-200 text-[10px] p-2 rounded-lg outline-none w-28 font-medium shadow-sm text-center uppercase text-gray-600" />
+                      <input type="date" value={photoStart} onChange={(e) => setPhotoStart(e.target.value)} className="bg-white border border-gray-200 text-[10px] p-2 rounded-lg outline-none w-32 font-medium shadow-sm text-center uppercase text-gray-600" />
                       <span className="text-gray-300">-</span>
-                      <input type="date" value={photoEnd} onChange={(e) => setPhotoEnd(e.target.value)} className="bg-white border border-gray-200 text-[10px] p-2 rounded-lg outline-none w-28 font-medium shadow-sm text-center uppercase text-gray-600" />
+                      <input type="date" value={photoEnd} onChange={(e) => setPhotoEnd(e.target.value)} className="bg-white border border-gray-200 text-[10px] p-2 rounded-lg outline-none w-32 font-medium shadow-sm text-center uppercase text-gray-600" />
                   </div>
               </div>
               <div className="grid grid-cols-2 gap-3 h-[85px] items-center text-center">
