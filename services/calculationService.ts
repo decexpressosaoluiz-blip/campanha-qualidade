@@ -66,6 +66,25 @@ const toYMD = (date: Date) => {
   return `${y}-${m}-${d}`;
 };
 
+const countWorkingDays = (start: Date, end: Date, holidays: Date[]): number => {
+  const holidaySet = new Set(holidays.map(h => toYMD(h)));
+  let count = 0;
+  const current = new Date(start);
+  current.setHours(12, 0, 0, 0); // Set to noon to avoid DST issues
+  const endDate = new Date(end);
+  endDate.setHours(12, 0, 0, 0);
+
+  while (current <= endDate) {
+    const day = current.getDay();
+    // 0 = Sunday, 6 = Saturday (Assuming Mon-Fri work week)
+    if (day !== 0 && day !== 6 && !holidaySet.has(toYMD(current))) {
+      count++;
+    }
+    current.setDate(current.getDate() + 1);
+  }
+  return count;
+};
+
 export interface DashboardSummary {
   totalDocs: number;
   faturamento: number;
@@ -116,8 +135,11 @@ export const calculateStats = (
 
   data.metas.forEach(m => { getOrCreateStats(m.unidade).meta = m.meta; });
 
-  const filterStart = dateRange?.start ? new Date(dateRange.start.setHours(0,0,0,0)) : null;
-  const filterEnd = dateRange?.end ? new Date(dateRange.end.setHours(23,59,59,999)) : null;
+  const filterStart = dateRange?.start ? new Date(dateRange.start.getTime()) : null;
+  const filterEnd = dateRange?.end ? new Date(dateRange.end.getTime()) : null;
+  
+  if (filterStart) filterStart.setHours(0, 0, 0, 0);
+  if (filterEnd) filterEnd.setHours(23, 59, 59, 999);
 
   let actualMaxDate: string | null = null;
   data.ctes.forEach(cte => {
@@ -200,7 +222,10 @@ export const calculateStats = (
     }
   });
 
-  const daysElapsed = Math.max(1, data.fixedDays.elapsed);
+  const daysElapsed = (filterStart && filterEnd) 
+    ? Math.max(1, countWorkingDays(filterStart, filterEnd, data.holidays))
+    : Math.max(1, data.fixedDays.elapsed);
+    
   const totalDaysInPeriod = Math.max(1, data.fixedDays.total);
 
   unitMap.forEach(stats => {

@@ -1,20 +1,29 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Painel Operacional São Luiz Express
 
-# Run and deploy your AI Studio app
+Este projeto é um painel operacional para monitoramento de metas, baixas e manifestos com cálculo de projeção e visualização de dados em tempo real.
 
-This contains everything you need to run your app locally.
+## Funcionalidades
 
-View your app in AI Studio: https://ai.studio/apps/drive/1zAsk1-R42J8mbQVs0bx5Wtnr8SZ8JRdT
+- Monitoramento de metas e faturamento consolidado.
+- Visualização de dados por unidade.
+- Cálculo de projeção baseado em dias úteis.
+- Gráficos de faturamento diário.
+- Integração com planilhas do Google Sheets para dados operacionais.
 
-## Run Locally
+## Tecnologias Utilizadas
 
-**Prerequisites:**  Node.js
+- React
+- TypeScript
+- Tailwind CSS
+- Recharts
+- Vite
 
+## Como Executar
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+1. Clone o repositório.
+2. Instale as dependências com `npm install`.
+3. Execute o projeto com `npm run dev`.
+
+## Deploy
+
+O projeto está configurado para deploy na Vercel.
