@@ -3,7 +3,18 @@ import { Cte, UnitMeta, AppData, UnitStats } from '../types';
 
 export const normalizeUnitName = (name: string): string => {
   if (!name) return '';
-  return name.trim().toUpperCase();
+  const normalized = name.trim().toUpperCase();
+  if (
+    normalized === 'SEM COLETA DEFINIDA' || 
+    normalized === 'SEM ENTREGA DEFINIDA' || 
+    normalized === 'NÃO DEFINIDA' || 
+    normalized === 'NAO DEFINIDA' ||
+    normalized === '#N/A' ||
+    normalized === '-'
+  ) {
+    return '';
+  }
+  return normalized;
 };
 
 export const normalizeStatus = (status: string): string => {
