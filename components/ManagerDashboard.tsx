@@ -24,6 +24,7 @@ type DashboardTab = 'gerencial' | 'unidades';
 type SalesSortField = 'unidade' | 'faturamento' | 'meta' | 'projecao' | 'percentualProjecao';
 type DeliverySortField = 'unidade' | 'totalRecebimentos' | 'pctNoPrazo' | 'pctSemBaixa' | 'pctForaPrazo';
 type PhotoSortField = 'unidade' | 'totalFotos' | 'pctComFoto' | 'pctSemFoto';
+type MdfeSortField = 'unidade' | 'totalMdfe' | 'pctComMdfe' | 'pctSemMdfe';
 
 const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, summary, allCtes, onSelectUnit, onDateFilterChange, dateRange, lastUpdate, fixedDays }) => {
   const [activeTab, setActiveTab] = useState<DashboardTab>('gerencial');
@@ -34,10 +35,12 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, summary, all
   const salesRef = useRef<HTMLDivElement>(null);
   const deliveryRef = useRef<HTMLDivElement>(null);
   const photoRef = useRef<HTMLDivElement>(null);
+  const mdfeRef = useRef<HTMLDivElement>(null);
   
   const [salesSort, setSalesSort] = useState<{field: SalesSortField, dir: SortDirection}>({ field: 'faturamento', dir: 'desc' });
   const [deliverySort, setDeliverySort] = useState<{field: DeliverySortField, dir: SortDirection}>({ field: 'pctNoPrazo', dir: 'desc' });
   const [photoSort, setPhotoSort] = useState<{field: PhotoSortField, dir: SortDirection}>({ field: 'pctComFoto', dir: 'desc' });
+  const [mdfeSort, setMdfeSort] = useState<{field: MdfeSortField, dir: SortDirection}>({ field: 'pctComMdfe', dir: 'desc' });
 
   const [deliveryLocalStart, setDeliveryLocalStart] = useState('');
   const [deliveryLocalEnd, setDeliveryLocalEnd] = useState('');
@@ -161,6 +164,17 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, summary, all
       return photoSort.dir === 'asc' ? valA - valB : valB - valA;
     });
   }, [filteredStats, photoSort]);
+
+  const sortedMdfeStats = useMemo(() => {
+    return filteredStats.map(s => {
+      const totalMdfe = s.comMdfe + s.semMdfe;
+      return { ...s, totalMdfe, pctComMdfe: totalMdfe > 0 ? (s.comMdfe / totalMdfe) * 100 : 0, pctSemMdfe: totalMdfe > 0 ? (s.semMdfe / totalMdfe) * 100 : 0 };
+    }).sort((a, b) => {
+      const valA = a[mdfeSort.field as keyof typeof a] as number;
+      const valB = b[mdfeSort.field as keyof typeof b] as number;
+      return mdfeSort.dir === 'asc' ? valA - valB : valB - valA;
+    });
+  }, [filteredStats, mdfeSort]);
 
   const SortIcon = ({ active, dir }: { active: boolean, dir: SortDirection }) => (
     active ? (dir === 'asc' ? <ArrowUp className="w-2.5 h-2.5 ml-1 text-sle-primary" /> : <ArrowDown className="w-2.5 h-2.5 ml-1 text-sle-primary" />) : <ArrowUpDown className="w-2.5 h-2.5 ml-1 opacity-20" />
@@ -458,6 +472,38 @@ const ManagerDashboard: React.FC<ManagerDashboardProps> = ({ stats, summary, all
                           <td className="px-4 py-3 font-bold text-xs uppercase text-gray-700 truncate">{stat.unidade}</td>
                           <td className="px-1 py-3 text-center text-green-600 font-bold text-xs">{stat.pctComFoto.toFixed(0)}%</td>
                           <td className="px-1 py-3 text-center text-red-600 font-bold text-xs">{stat.pctSemFoto.toFixed(0)}%</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+            </div>
+
+            <div ref={mdfeRef} className="bg-white rounded-2xl shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07)] overflow-hidden border border-gray-100">
+                <div className="p-4 border-b border-gray-50 bg-[#F8F9FD] flex items-center justify-between">
+                  <h3 className="font-bold text-xs uppercase tracking-widest text-gray-500">Ranking Manifestos</h3>
+                  <div className="flex items-center gap-3">
+                    <button onClick={() => exportElement(mdfeRef, 'ranking-manifestos')} className="p-1.5 bg-white border border-gray-200 rounded-lg text-gray-400 hover:text-sle-primary hover:bg-gray-50 transition-all shadow-sm">
+                      <Download className="w-3.5 h-3.5" />
+                    </button>
+                    <Info className="w-4 h-4 text-gray-300 cursor-help" />
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left table-fixed min-w-[400px]">
+                    <thead className="bg-white text-gray-500 border-b border-gray-100">
+                      <tr>
+                        <th className="px-4 py-3 cursor-pointer text-[10px] uppercase font-bold tracking-wider hover:bg-gray-50 text-gray-400" onClick={() => setMdfeSort({field:'unidade', dir: mdfeSort.dir==='asc'?'desc':'asc'})}><div className="flex items-center">AGÊNCIA <SortIcon active={mdfeSort.field === 'unidade'} dir={mdfeSort.dir} /></div></th>
+                        <th className="text-center cursor-pointer text-[10px] uppercase font-bold tracking-wider hover:bg-gray-50 text-green-700/70" onClick={() => setMdfeSort({field:'pctComMdfe', dir: mdfeSort.dir==='asc'?'desc':'asc'})}><div className="flex items-center justify-center">% COM MDFE <SortIcon active={mdfeSort.field === 'pctComMdfe'} dir={mdfeSort.dir} /></div></th>
+                        <th className="text-center cursor-pointer text-[10px] uppercase font-bold tracking-wider hover:bg-gray-50 text-red-600/70" onClick={() => setMdfeSort({field:'pctSemMdfe', dir: mdfeSort.dir==='asc'?'desc':'asc'})}><div className="flex items-center justify-center">% SEM MDFE <SortIcon active={mdfeSort.field === 'pctSemMdfe'} dir={mdfeSort.dir} /></div></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {sortedMdfeStats.map(stat => (
+                        <tr key={stat.unidade} onClick={() => handleUnitClick(stat.unidade)} className="hover:bg-green-50/10 cursor-pointer transition-colors">
+                          <td className="px-4 py-3 font-bold text-xs uppercase text-gray-700 truncate">{stat.unidade}</td>
+                          <td className="px-1 py-3 text-center text-green-600 font-bold text-xs">{stat.pctComMdfe.toFixed(0)}%</td>
+                          <td className="px-1 py-3 text-center text-red-600 font-bold text-xs">{stat.pctSemMdfe.toFixed(0)}%</td>
                         </tr>
                       ))}
                     </tbody>
