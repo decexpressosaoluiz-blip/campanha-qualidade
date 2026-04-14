@@ -13,10 +13,12 @@ interface DailyRevenueChartProps {
 }
 
 const CustomDot = (props: any) => {
-  const { cx, cy, payload, average } = props;
+  const { cx, cy, payload } = props;
   if (!cx || !cy) return null;
   
   const val = payload.value;
+  const average = payload.dayOfWeekAverage;
+  
   let fill = '#EAB308'; // Yellow (Na média)
   if (val > average * 1.05) fill = '#22c55e'; // Green (Acima)
   else if (val < average * 0.95) fill = '#ef4444'; // Red (Abaixo)
@@ -51,20 +53,40 @@ const DailyRevenueChart: React.FC<DailyRevenueChartProps> = ({ ctes, unitName, s
         });
     });
 
-    const data = Array.from(dailyMap.entries())
-      .map(([date, info]) => ({ 
-        date, 
-        value: info.value,
-        count: info.count,
-        dayObj: new Date(date + 'T12:00:00') 
-      }))
+    const rawData = Array.from(dailyMap.entries())
+      .map(([date, info]) => {
+        const dayObj = new Date(date + 'T12:00:00');
+        return { 
+          date, 
+          value: info.value,
+          count: info.count,
+          dayObj,
+          dayOfWeek: dayObj.getDay()
+        };
+      })
       .filter(d => d.value > 0)
       .sort((a, b) => a.dayObj.getTime() - b.dayObj.getTime());
 
-    const totalVal = data.reduce((acc, curr) => acc + curr.value, 0);
-    const average = data.length > 0 ? totalVal / data.length : 0;
+    // Calculate average per day of week
+    const dayOfWeekTotals = new Map<number, { sum: number; count: number }>();
+    rawData.forEach(d => {
+      const current = dayOfWeekTotals.get(d.dayOfWeek) || { sum: 0, count: 0 };
+      dayOfWeekTotals.set(d.dayOfWeek, {
+        sum: current.sum + d.value,
+        count: current.count + 1
+      });
+    });
 
-    return { data, average };
+    const data = rawData.map(d => {
+      const stats = dayOfWeekTotals.get(d.dayOfWeek);
+      const dayOfWeekAverage = stats && stats.count > 0 ? stats.sum / stats.count : 0;
+      return {
+        ...d,
+        dayOfWeekAverage
+      };
+    });
+
+    return { data };
   }, [ctes, unitName, startDate, endDate]);
 
   if (chartData.data.length === 0) return null;
@@ -122,8 +144,9 @@ const DailyRevenueChart: React.FC<DailyRevenueChartProps> = ({ ctes, unitName, s
                         content={({ active, payload }) => {
                             if (active && payload && payload.length) {
                                 const data = payload[0].payload;
-                                const performance = data.value > chartData.average * 1.05 ? 'ACIMA DA MÉDIA' : 
-                                              data.value < chartData.average * 0.95 ? 'ABAIXO DA MÉDIA' : 'NA MÉDIA';
+                                const average = data.dayOfWeekAverage;
+                                const performance = data.value > average * 1.05 ? 'ACIMA DA MÉDIA' : 
+                                              data.value < average * 0.95 ? 'ABAIXO DA MÉDIA' : 'NA MÉDIA';
                                 const perfColor = performance === 'ACIMA DA MÉDIA' ? 'text-green-600' : 
                                                 performance === 'ABAIXO DA MÉDIA' ? 'text-red-600' : 'text-yellow-600';
 
@@ -169,7 +192,7 @@ const DailyRevenueChart: React.FC<DailyRevenueChartProps> = ({ ctes, unitName, s
                         fillOpacity={1} 
                         fill="url(#colorValue)" 
                         activeDot={{ r: 6, strokeWidth: 0 }}
-                        dot={<CustomDot average={chartData.average} />}
+                        dot={<CustomDot />}
                     >
                         <LabelList 
                             dataKey="value" 
