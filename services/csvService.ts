@@ -12,6 +12,18 @@ export const fetchCsv = async (url: string): Promise<string[][]> => {
   
   const text = await response.text();
   
+  let delimiter = ',';
+  // Auto-detect delimiter by checking the first line
+  const firstLineIdx = text.indexOf('\n');
+  if (firstLineIdx > -1) {
+    const firstLine = text.substring(0, firstLineIdx);
+    const commaCount = (firstLine.match(/,/g) || []).length;
+    const semiCount = (firstLine.match(/;/g) || []).length;
+    const tabCount = (firstLine.match(/\t/g) || []).length;
+    if (semiCount > commaCount && semiCount > tabCount) delimiter = ';';
+    else if (tabCount > commaCount) delimiter = '\t';
+  }
+  
   const rows: string[][] = [];
   let currentRow: string[] = [];
   let currentCell = '';
@@ -33,7 +45,7 @@ export const fetchCsv = async (url: string): Promise<string[][]> => {
     } else {
       if (char === '"') {
         inQuotes = true;
-      } else if (char === ',') {
+      } else if (char === delimiter) {
         currentRow.push(currentCell.trim()); // Trim whitespace from values immediately
         currentCell = '';
       } else if (char === '\n' || char === '\r') {

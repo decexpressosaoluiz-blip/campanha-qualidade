@@ -233,8 +233,13 @@ export const calculateStats = (
     }
   });
 
-  const daysElapsed = (filterStart && filterEnd) 
-    ? Math.max(1, countWorkingDays(filterStart, filterEnd, data.holidays))
+  let effectiveElapsedEnd = filterEnd;
+  if (filterEnd && data.lastUpdate && filterEnd > data.lastUpdate) {
+    effectiveElapsedEnd = data.lastUpdate;
+  }
+
+  const daysElapsed = (filterStart && effectiveElapsedEnd) 
+    ? Math.max(1, countWorkingDays(filterStart, effectiveElapsedEnd, data.holidays))
     : Math.max(1, data.fixedDays.elapsed);
     
   const totalDaysInPeriod = Math.max(1, data.fixedDays.total);
